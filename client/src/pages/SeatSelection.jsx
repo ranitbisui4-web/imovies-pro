@@ -1,10 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { io } from "socket.io-client";
-import { CheckCircle2, Tag, CreditCard, Smartphone } from "lucide-react";
+import { ShieldCheck, Tag } from "lucide-react";
 import api, { API_BASE_URL } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useAIControl } from "../context/AIControlContext";
+import PaymentGatewayModal from "../components/PaymentGatewayModal";
+
+const CONVENIENCE_FEE_PER_SEAT = 25;
+const GST_RATE = 0.18;
 
 const SeatSelection = () => {
   const { showId } = useParams();
@@ -15,8 +19,8 @@ const SeatSelection = () => {
   const [show, setShow] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [promoCode, setPromoCode] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("UPI");
-  const [bookingLoading, setBookingLoading] = useState(false);
+  const [creatingOrder, setCreatingOrder] = useState(false);
+  const [paymentOrder, setPaymentOrder] = useState(null);
   const [error, setError] = useState("");
   const socketRef = useRef(null);
 
@@ -95,31 +99,33 @@ const SeatSelection = () => {
     return sum + theatre.lowerSeatPrice;
   }, 0);
 
+  const convenienceFee = selectedSeats.length * CONVENIENCE_FEE_PER_SEAT;
+  const gst = Math.round(convenienceFee * GST_RATE);
   const code = promoCode.trim().toUpperCase();
   const discount =
     code === "IMOVIES20" ? Math.round(subtotal * 0.2) : code === "FIRST50" ? Math.min(50, subtotal) : 0;
-  const total = Math.max(0, subtotal - discount);
+  const total = Math.max(0, subtotal + convenienceFee + gst - discount);
 
-  const handleCheckout = async () => {
+  const handleProceedToPayment = async () => {
     if (!user) {
       navigate("/login");
       return;
     }
     if (selectedSeats.length === 0) return;
+
     setError("");
-    setBookingLoading(true);
+    setCreatingOrder(true);
     try {
-      await api.post("/bookings", {
+      const { data } = await api.post("/payments/create-order", {
         showId,
         seats: selectedSeats,
         promoCode: code,
-        paymentMethod,
       });
-      navigate("/bookings");
+      setPaymentOrder(data);
     } catch (err) {
-      setError(err.response?.data?.message || "Booking failed");
+      setError(err.response?.data?.message || "Could not initialize payment order");
     } finally {
-      setBookingLoading(false);
+      setCreatingOrder(false);
     }
   };
 
@@ -150,7 +156,7 @@ const SeatSelection = () => {
         </div>
       </div>
 
-      <div className="grid gap-8 lg:grid-cols-[1fr,340px]">
+      <div className="grid gap-8 lg:grid-cols-[1fr,360px]">
         {/* Seat Layout */}
         <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
           <div className="mx-auto mb-8 max-w-md">
@@ -205,7 +211,7 @@ const SeatSelection = () => {
         <div className="h-fit rounded-3xl border border-slate-800 bg-[#111827] p-6">
           <h2 className="text-lg font-bold text-white">Booking Summary</h2>
 
-          <div className="mt-4 space-y-2 text-sm">
+          <div className="mt-4 space-y-2.5 text-sm">
             <div className="flex justify-between">
               <span className="text-slate-400">Selected Seats</span>
               <span className="font-bold text-emerald-400">
@@ -213,9 +219,21 @@ const SeatSelection = () => {
               </span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Subtotal</span>
+              <span className="text-slate-400">Ticket Subtotal</span>
               <span className="text-white">₹{subtotal}</span>
             </div>
+            {selectedSeats.length > 0 && (
+              <>
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>Convenience Fee (₹25 × {selectedSeats.length})</span>
+                  <span>₹{convenienceFee}</span>
+                </div>
+                <div className="flex justify-between text-xs text-slate-400">
+                  <span>GST (18% on fee)</span>
+                  <span>₹{gst}</span>
+                </div>
+              </>
+            )}
             {discount > 0 && (
               <div className="flex justify-between text-emerald-400">
                 <span>Promo Discount ({code})</span>
@@ -223,7 +241,7 @@ const SeatSelection = () => {
               </div>
             )}
             <div className="flex justify-between border-t border-slate-800 pt-3 text-base font-extrabold text-white">
-              <span>Total Payable</span>
+              <span>Amount Payable</span>
               <span>₹{total}</span>
             </div>
           </div>
@@ -241,51 +259,35 @@ const SeatSelection = () => {
             />
           </div>
 
-          {/* Payment Method */}
-          <div className="mt-5">
-            <label className="mb-2 block text-xs font-semibold text-slate-400">Payment Method</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("UPI")}
-                className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-bold ${
-                  paymentMethod === "UPI"
-                    ? "border-red-500 bg-red-600/20 text-white"
-                    : "border-slate-700 bg-slate-900 text-slate-400"
-                }`}
-              >
-                <Smartphone className="h-4 w-4" /> UPI QR
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaymentMethod("CARD")}
-                className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 text-xs font-bold ${
-                  paymentMethod === "CARD"
-                    ? "border-red-500 bg-red-600/20 text-white"
-                    : "border-slate-700 bg-slate-900 text-slate-400"
-                }`}
-              >
-                <CreditCard className="h-4 w-4" /> Card
-              </button>
-            </div>
-          </div>
-
           {error && <p className="mt-3 text-xs font-medium text-red-400">{error}</p>}
 
           <button
-            onClick={handleCheckout}
-            disabled={selectedSeats.length === 0 || bookingLoading}
-            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-sm font-bold text-white shadow-lg shadow-red-600/25 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={handleProceedToPayment}
+            disabled={selectedSeats.length === 0 || creatingOrder}
+            className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 py-3.5 text-sm font-bold text-white shadow-lg shadow-red-600/25 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            <CheckCircle2 className="h-4 w-4" />
-            {bookingLoading
-              ? "Confirming..."
+            <ShieldCheck className="h-4 w-4" />
+            {creatingOrder
+              ? "Opening Secure Checkout..."
               : user
-              ? `Pay ₹${total} & Confirm`
-              : "Sign In to Confirm"}
+              ? `Proceed to Pay ₹${total}`
+              : "Sign In to Book"}
           </button>
+
+          <p className="mt-2.5 text-center text-[11px] text-slate-500">
+            Supports UPI QR, GPay, PhonePe, Cards, Net Banking & Wallets
+          </p>
         </div>
       </div>
+
+      <PaymentGatewayModal
+        order={paymentOrder}
+        onClose={() => setPaymentOrder(null)}
+        onSuccess={(confirmedBooking) => {
+          setPaymentOrder(null);
+          navigate("/bookings", { state: { newBooking: confirmedBooking } });
+        }}
+      />
     </div>
   );
 };

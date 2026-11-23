@@ -18,7 +18,9 @@ import AdminDashboard from "./pages/AdminDashboard";
 const ProtectedRoute = ({ children, adminOnly = false }) => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (adminOnly && user.role !== "admin") return <Navigate to="/" replace />;
+  if (adminOnly && user.role !== "admin" && user.role !== "manager") {
+    return <Navigate to="/" replace />;
+  }
   return children;
 };
 

@@ -1,13 +1,31 @@
 import React, { useEffect, useState } from "react";
-import { Trash2, PlusCircle, Film, Building2, CalendarClock, Ticket } from "lucide-react";
+import {
+  Trash2,
+  PlusCircle,
+  Film,
+  Building2,
+  CalendarClock,
+  Ticket,
+  Crown,
+  CheckCircle2,
+  XCircle,
+  Users,
+} from "lucide-react";
 import api from "../services/api";
+import { useAuth } from "../context/AuthContext";
 
 const AdminDashboard = () => {
-  const [tab, setTab] = useState("movies");
+  const { user } = useAuth();
+  const isManager = user?.role === "manager";
+
+  const [tab, setTab] = useState(isManager ? "approvals" : "movies");
   const [movies, setMovies] = useState([]);
   const [theatres, setTheatres] = useState([]);
   const [shows, setShows] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [pendingRequests, setPendingRequests] = useState([]);
+  const [allUsers, setAllUsers] = useState([]);
+  const [feedback, setFeedback] = useState("");
 
   const [movieForm, setMovieForm] = useState({
     movieName: "",
@@ -18,7 +36,8 @@ const AdminDashboard = () => {
     runtime: 150,
     certification: "U/A",
     rating: 8.5,
-    posterUrl: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=600&q=80",
+    posterUrl:
+      "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=600&q=80",
     trailerUrl: "",
   });
 
@@ -42,21 +61,35 @@ const AdminDashboard = () => {
   });
 
   const refreshAll = async () => {
-    const [m, t, s, b] = await Promise.all([
+    const coreCalls = [
       api.get("/movies"),
       api.get("/theatres"),
       api.get("/shows"),
       api.get("/bookings/all"),
-    ]);
-    setMovies(m.data);
-    setTheatres(t.data);
-    setShows(s.data);
-    setBookings(b.data);
+    ];
+    if (isManager) {
+      coreCalls.push(api.get("/manager/requests"), api.get("/manager/users"));
+    }
+
+    const results = await Promise.all(coreCalls);
+    setMovies(results[0].data);
+    setTheatres(results[1].data);
+    setShows(results[2].data);
+    setBookings(results[3].data);
+    if (isManager) {
+      setPendingRequests(results[4].data);
+      setAllUsers(results[5].data);
+    }
   };
 
   useEffect(() => {
     refreshAll();
-  }, []);
+  }, [isManager]);
+
+  const showToast = (msg) => {
+    setFeedback(msg);
+    setTimeout(() => setFeedback(""), 4000);
+  };
 
   const totalRevenue = bookings
     .filter((b) => b.status === "CONFIRMED")
@@ -66,6 +99,7 @@ const AdminDashboard = () => {
     e.preventDefault();
     await api.post("/movies", movieForm);
     setMovieForm({ ...movieForm, movieName: "", description: "" });
+    showToast("Movie added successfully.");
     refreshAll();
   };
 
@@ -73,21 +107,72 @@ const AdminDashboard = () => {
     e.preventDefault();
     await api.post("/theatres", theatreForm);
     setTheatreForm({ ...theatreForm, theatreName: "", location: "" });
+    showToast("Theatre added successfully.");
     refreshAll();
   };
 
   const handleAddShow = async (e) => {
     e.preventDefault();
     await api.post("/shows", showForm);
+    showToast("Show scheduled successfully.");
     refreshAll();
   };
+
+  const handleApprove = async (userId) => {
+    const { data } = await api.patch(`/manager/requests/${userId}/approve`);
+    showToast(data.message);
+    refreshAll();
+  };
+
+  const handleReject = async (userId) => {
+    const { data } = await api.patch(`/manager/requests/${userId}/reject`, {});
+    showToast(data.message);
+    refreshAll();
+  };
+
+  const handleDirectRoleChange = async (userId, newRole) => {
+    try {
+      const { data } = await api.patch(`/manager/users/${userId}/role`, { role: newRole });
+      showToast(data.message);
+      refreshAll();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Could not update role");
+    }
+  };
+
+  const tabs = [
+    ...(isManager
+      ? [{ id: "approvals", label: `Approvals & Team (${pendingRequests.length})`, icon: Crown }]
+      : []),
+    { id: "movies", label: "Movies", icon: Film },
+    { id: "theatres", label: "Theatres", icon: Building2 },
+    { id: "shows", label: "Shows", icon: CalendarClock },
+    { id: "bookings", label: "All Bookings", icon: Ticket },
+  ];
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-black text-white">
-          Admin <span className="text-red-500">Dashboard</span>
-        </h1>
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-black text-white">
+            {isManager ? (
+              <>
+                <Crown className="h-6 w-6 text-amber-400" />
+                Manager <span className="text-red-500">Governance & Dashboard</span>
+              </>
+            ) : (
+              <>
+                Admin <span className="text-red-500">Dashboard</span>
+              </>
+            )}
+          </h1>
+          <p className="mt-1 text-xs text-slate-400">
+            {isManager
+              ? "Approve new Admins & Managers, manage team permissions, and oversee cinema operations."
+              : "Manage movies, theatres, shows, and customer bookings."}
+          </p>
+        </div>
+
         <div className="flex flex-wrap gap-3 text-xs">
           <div className="rounded-xl border border-slate-800 bg-[#111827] px-4 py-2">
             Movies: <strong className="text-white">{movies.length}</strong>
@@ -101,14 +186,15 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {/* Tabs */}
+      {feedback && (
+        <div className="mb-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2.5 text-sm font-medium text-emerald-300">
+          {feedback}
+        </div>
+      )}
+
+      {/* Navigation Tabs */}
       <div className="mb-6 flex flex-wrap gap-2">
-        {[
-          { id: "movies", label: "Movies", icon: Film },
-          { id: "theatres", label: "Theatres", icon: Building2 },
-          { id: "shows", label: "Shows", icon: CalendarClock },
-          { id: "bookings", label: "All Bookings", icon: Ticket },
-        ].map((item) => {
+        {tabs.map((item) => {
           const Icon = item.icon;
           return (
             <button
@@ -117,7 +203,7 @@ const AdminDashboard = () => {
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold ${
                 tab === item.id
                   ? "bg-red-600 text-white"
-                  : "border border-slate-800 bg-[#111827] text-slate-300"
+                  : "border border-slate-800 bg-[#111827] text-slate-300 hover:border-slate-600"
               }`}
             >
               <Icon className="h-4 w-4" /> {item.label}
@@ -125,6 +211,141 @@ const AdminDashboard = () => {
           );
         })}
       </div>
+
+      {/* MANAGER-ONLY APPROVALS & TEAM TAB */}
+      {tab === "approvals" && isManager && (
+        <div className="space-y-8">
+          <div>
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-white">
+              <Crown className="h-5 w-5 text-amber-400" />
+              Pending Admin & Manager Requests ({pendingRequests.length})
+            </h2>
+
+            {pendingRequests.length === 0 ? (
+              <div className="rounded-2xl border border-slate-800 bg-[#111827] p-8 text-center text-sm text-slate-400">
+                No pending Admin or Manager approval requests right now.
+              </div>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2">
+                {pendingRequests.map((reqUser) => (
+                  <div
+                    key={reqUser._id}
+                    className="flex flex-col justify-between gap-4 rounded-2xl border border-amber-500/30 bg-[#111827] p-5"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="font-bold text-white">{reqUser.username}</h3>
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${
+                            reqUser.requestedRole === "manager"
+                              ? "bg-purple-500/20 text-purple-300"
+                              : "bg-amber-500/20 text-amber-300"
+                          }`}
+                        >
+                          Requesting: {reqUser.requestedRole}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-400">{reqUser.email}</p>
+                      <p className="mt-2 text-[11px] text-slate-500">
+                        Applied on {new Date(reqUser.createdAt).toLocaleString()}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleApprove(reqUser._id)}
+                        className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white hover:bg-emerald-500"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        Approve as {reqUser.requestedRole.toUpperCase()}
+                      </button>
+                      <button
+                        onClick={() => handleReject(reqUser._id)}
+                        className="flex items-center justify-center gap-1 rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-2 text-xs font-bold text-red-400 hover:bg-red-500/20"
+                      >
+                        <XCircle className="h-4 w-4" /> Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-white">
+              <Users className="h-5 w-5 text-red-500" />
+              All Accounts & Role Directory ({allUsers.length})
+            </h2>
+            <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-[#111827]">
+              <table className="w-full text-left text-sm">
+                <thead className="border-b border-slate-800 text-xs uppercase text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3">Current Role</th>
+                    <th className="px-4 py-3">Approved By</th>
+                    <th className="px-4 py-3 text-right">Manage Role</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/70">
+                  {allUsers.map((u) => (
+                    <tr key={u._id} className="hover:bg-slate-900/50">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-white">{u.username}</p>
+                        <p className="text-xs text-slate-400">{u.email}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase ${
+                            u.role === "manager"
+                              ? "bg-purple-500/20 text-purple-300"
+                              : u.role === "admin"
+                              ? "bg-amber-500/20 text-amber-300"
+                              : "bg-slate-700 text-slate-300"
+                          }`}
+                        >
+                          {u.role}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-400">
+                        {u.approvedBy?.username || (u.role === "manager" ? "System Bootstrap" : "—")}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex gap-1.5">
+                          {u.role !== "admin" && (
+                            <button
+                              onClick={() => handleDirectRoleChange(u._id, "admin")}
+                              className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/20"
+                            >
+                              Make Admin
+                            </button>
+                          )}
+                          {u.role !== "manager" && (
+                            <button
+                              onClick={() => handleDirectRoleChange(u._id, "manager")}
+                              className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-xs font-semibold text-purple-300 hover:bg-purple-500/20"
+                            >
+                              Make Manager
+                            </button>
+                          )}
+                          {u.role !== "user" && (
+                            <button
+                              onClick={() => handleDirectRoleChange(u._id, "user")}
+                              className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 hover:border-red-500 hover:text-red-400"
+                            >
+                              Revoke
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MOVIES TAB */}
       {tab === "movies" && (
@@ -300,7 +521,9 @@ const AdminDashboard = () => {
             >
               <option value="">Select Movie</option>
               {movies.map((m) => (
-                <option key={m._id} value={m._id}>{m.movieName}</option>
+                <option key={m._id} value={m._id}>
+                  {m.movieName}
+                </option>
               ))}
             </select>
             <select
@@ -311,7 +534,9 @@ const AdminDashboard = () => {
             >
               <option value="">Select Theatre</option>
               {theatres.map((t) => (
-                <option key={t._id} value={t._id}>{t.theatreName}</option>
+                <option key={t._id} value={t._id}>
+                  {t.theatreName}
+                </option>
               ))}
             </select>
             <div className="grid grid-cols-2 gap-2">
@@ -375,11 +600,17 @@ const AdminDashboard = () => {
             >
               <div>
                 <p className="font-bold text-white">
-                  {b.movieTitle} <span className="font-mono text-xs text-slate-400">({b.bookingId})</span>
+                  {b.movieTitle}{" "}
+                  <span className="font-mono text-xs text-slate-400">({b.bookingId})</span>
                 </p>
                 <p className="text-xs text-slate-400">
                   User: {b.user?.email || "N/A"} • {b.theatreName} • {b.showdate} {b.showtime}
                 </p>
+                {b.transactionId && (
+                  <p className="font-mono text-[11px] text-slate-500">
+                    TXN: {b.transactionId} • {b.paymentDetails || b.paymentMethod}
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <p className="font-bold text-emerald-400">
