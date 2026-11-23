@@ -17,23 +17,41 @@ const seedData = async () => {
     Show.deleteMany({}),
   ]);
 
-  const [userPassword, adminPassword] = await Promise.all([
+  const [userPassword, adminPassword, managerPassword] = await Promise.all([
     bcrypt.hash("password123", 10),
     bcrypt.hash("admin123", 10),
+    bcrypt.hash(process.env.MANAGER_PASSWORD || "Manager@2026", 10),
   ]);
 
+  // 1. Create the Head Manager account (can approve new Admins & new Managers)
+  const manager = await User.create({
+    username: "Head Manager",
+    email: (process.env.MANAGER_EMAIL || "manager@imovies.com").toLowerCase(),
+    password: managerPassword,
+    role: "manager",
+    requestedRole: "none",
+    approvalStatus: "approved",
+  });
+
+  // 2. Create Cinema Admin account (approved by Manager)
   const admin = await User.create({
     username: "Cinema Admin",
     email: "admin@imovies.com",
     password: adminPassword,
     role: "admin",
+    requestedRole: "none",
+    approvalStatus: "approved",
+    approvedBy: manager._id,
   });
 
+  // 3. Create Demo Customer account
   await User.create({
     username: "Demo Customer",
     email: "demo@imovies.com",
     password: userPassword,
     role: "user",
+    requestedRole: "none",
+    approvalStatus: "approved",
   });
 
   const movies = await Movie.insertMany([
@@ -199,8 +217,9 @@ const seedData = async () => {
   await Show.insertMany(showDocs);
 
   console.log("Seed completed successfully!");
-  console.log("Customer Login -> demo@imovies.com / password123");
+  console.log("Manager Login  -> manager@imovies.com / Manager@2026");
   console.log("Admin Login    -> admin@imovies.com / admin123");
+  console.log("Customer Login -> demo@imovies.com / password123");
   process.exit(0);
 };
 

@@ -21,10 +21,28 @@ const protect = async (req, res, next) => {
 };
 
 const adminOnly = (req, res, next) => {
-  if (!req.user || req.user.role !== "admin") {
-    return res.status(403).json({ message: "Admin access required" });
+  if (!req.user) {
+    return res.status(401).json({ message: "Not authorized" });
+  }
+  if (req.user.role === "manager") {
+    return next();
+  }
+  if (req.user.role === "admin") {
+    if (!req.user.isApproved) {
+      return res.status(403).json({
+        message: "Your Admin account is awaiting Manager approval.",
+      });
+    }
+    return next();
+  }
+  return res.status(403).json({ message: "Approved Admin or Manager access required" });
+};
+
+const managerOnly = (req, res, next) => {
+  if (!req.user || req.user.role !== "manager") {
+    return res.status(403).json({ message: "Super Manager access required" });
   }
   next();
 };
 
-module.exports = { protect, adminOnly };
+module.exports = { protect, adminOnly, managerOnly };

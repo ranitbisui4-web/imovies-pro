@@ -4,14 +4,24 @@ const User = require("../models/User");
 
 const signToken = (user) =>
   jwt.sign(
-    { id: user._id, role: user.role, email: user.email },
+    { id: user._id, role: user.role, isApproved: user.isApproved, email: user.email },
     process.env.JWT_SECRET || "imovies_fallback_secret",
     { expiresIn: "7d" }
   );
 
+const formatUser = (user) => ({
+  id: user._id,
+  username: user.username,
+  email: user.email,
+  phone: user.phone,
+  role: user.role,
+  isApproved: user.isApproved,
+  theatreRequestName: user.theatreRequestName,
+});
+
 exports.register = async (req, res) => {
   try {
-    const { username, email, password, phone, role } = req.body;
+    const { username, email, password, phone, role, theatreRequestName } = req.body;
     if (!username || !email || !password) {
       return res.status(400).json({ message: "Username, email, and password are required" });
     }
@@ -19,25 +29,27 @@ exports.register = async (req, res) => {
     if (existing) {
       return res.status(400).json({ message: "Email is already registered" });
     }
+
+    // Never allow self-registration as 'manager'; 'admin' starts unapproved
+    const requestedRole = role === "admin" ? "admin" : "user";
+    const isApproved = requestedRole === "user";
+
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({
       username,
       email: email.toLowerCase(),
       password: hashedPassword,
       phone: phone || "",
-      role: role === "admin" ? "admin" : "user",
+      role: requestedRole,
+      isApproved,
+      theatreRequestName: requestedRole === "admin" ? theatreRequestName || "" : "",
     });
 
     const token = signToken(user);
     res.status(201).json({
       token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-      },
+      user: formatUser(user),
+      pendingApproval: !isApproved,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -58,13 +70,7 @@ exports.login = async (req, res) => {
     const token = signToken(user);
     res.json({
       token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-      },
+      user: formatUser(user),
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -72,7 +78,7 @@ exports.login = async (req, res) => {
 };
 
 exports.getProfile = async (req, res) => {
-  res.json({ user: req.user });
+  res.json({ user: formatUser(req.user) });
 };
 
 exports.updateProfile = async (req, res) => {
@@ -83,7 +89,47 @@ exports.updateProfile = async (req, res) => {
       { ...(username && { username }), ...(phone !== undefined && { phone }) },
       { new: true }
     ).select("-password");
-    res.json({ user });
+    res.json({ user: formatUser(user) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Manager-only endpoints for Admin Approval
+exports.getAdminRequests = async (req, res) => {
+  try {
+    const admins = await User.find({ role: "admin" })
+      .select("-password")
+      .sort({ isApproved: 1, createdAt: -1 });
+    res.json(admins);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.approveAdmin = async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isApproved: true },
+      { new: true }
+    ).select("-password");
+    if (!user) return res.status(404).json({ message: "Admin applicant not found" });
+    res.json({ message: `${user.username} approved as Admin`, user: formatUser(user) });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.rejectAdmin = async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role: "user", isApproved: true },
+      { new: true }
+    ).select("-password");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    res.json({ message: `Admin request rejected; converted to Customer`, user: formatUser(user) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
