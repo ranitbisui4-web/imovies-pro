@@ -125,13 +125,15 @@ const Navbar = () => {
             </>
           )}
 
-          {user?.role === "admin" && (
+          {(user?.role === "admin" || user?.role === "manager") && (
             <Link
               to="/admin"
               className="flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1.5 text-sm font-medium text-amber-300 hover:bg-amber-500/20"
             >
               <ShieldCheck className="h-4 w-4" />
-              <span className="hidden md:inline">Admin</span>
+              <span className="hidden md:inline">
+                {user?.role === "manager" ? "Manager" : "Admin"}
+              </span>
             </Link>
           )}
 
