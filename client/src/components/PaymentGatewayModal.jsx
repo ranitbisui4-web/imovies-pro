@@ -112,11 +112,12 @@ const PaymentGatewayModal = ({ order, onClose, onSuccess }) => {
       setStage("VERIFYING");
       await new Promise((r) => setTimeout(r, 900));
 
-      const { data } = await api.post("/payments/verify", {
+     const { data } = await api.post("/payments/verify", {
         orderId: order.orderId,
         showId: order.showId,
         seats: order.seats,
         totalAmount: order.totalAmount,
+        promoCode: order.promoCode || "",
         paymentMethod: method,
         paymentDetails: buildPaymentDetails(),
       });
