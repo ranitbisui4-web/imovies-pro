@@ -17,6 +17,7 @@ import { useAuth } from "../context/AuthContext";
 const AdminDashboard = () => {
   const { user } = useAuth();
   const isManager = user?.role === "manager";
+  const isPendingAdmin = user?.role === "admin" && !user?.isApproved;
 
   const [tab, setTab] = useState(isManager ? "approvals" : "movies");
   const [movies, setMovies] = useState([]);
@@ -83,8 +84,31 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
+    if (!user || isPendingAdmin) return;
     refreshAll();
-  }, [isManager]);
+  }, [user, isManager, isPendingAdmin]);
+
+  if (isPendingAdmin) {
+    return (
+      <div className="mx-auto max-w-2xl px-4 py-16">
+        <div className="rounded-3xl border border-amber-500/30 bg-[#111827] p-8 text-center shadow-2xl">
+          <Crown className="mx-auto h-12 w-12 text-amber-400" />
+          <h1 className="mt-4 text-2xl font-black text-white">
+            Admin Access <span className="text-amber-400">Pending Approval</span>
+          </h1>
+          <p className="mt-2 text-sm text-slate-300">
+            Your Theatre Admin account is registered, but admin tools remain locked until the Head
+            Manager approves your request.
+          </p>
+          {user?.theatreRequestName && (
+            <p className="mt-3 text-xs text-slate-400">
+              Requested Theatre: <strong className="text-white">{user.theatreRequestName}</strong>
+            </p>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   const showToast = (msg) => {
     setFeedback(msg);
