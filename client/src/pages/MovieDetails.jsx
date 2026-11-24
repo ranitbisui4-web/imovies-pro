@@ -10,23 +10,42 @@ const MovieDetails = () => {
   const [movie, setMovie] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [favorited, setFavorited] = useState(false);
+  const [togglingFavorite, setTogglingFavorite] = useState(false);
   const [rating, setRating] = useState(9);
   const [comment, setComment] = useState("");
 
   useEffect(() => {
     api.get(`/movies/${id}`).then((res) => setMovie(res.data));
     api.get(`/reviews/${id}`).then((res) => setReviews(res.data));
-    if (user) {
-      api.get("/favorites").then((res) => {
-        setFavorited(res.data.some((m) => m._id === id));
-      });
+  }, [id]);
+
+  useEffect(() => {
+    if (!user) {
+      setFavorited(false);
+      return;
     }
+    api
+      .get("/favorites")
+      .then((res) => {
+        const list = Array.isArray(res.data) ? res.data : [];
+        setFavorited(list.some((m) => String(m._id) === String(id)));
+      })
+      .catch((err) => console.error("Failed to load watchlist status:", err));
   }, [id, user]);
 
   const handleToggleFavorite = async () => {
     if (!user) return alert("Please sign in to save favorites.");
-    const { data } = await api.post("/favorites/toggle", { movieId: id });
-    setFavorited(data.favorited);
+    if (togglingFavorite) return;
+    setTogglingFavorite(true);
+    try {
+      const targetMovieId = movie?._id || id;
+      const { data } = await api.post("/favorites/toggle", { movieId: targetMovieId });
+      setFavorited(Boolean(data.favorited));
+    } catch (err) {
+      alert(err.response?.data?.message || "Could not update watchlist. Please try again.");
+    } finally {
+      setTogglingFavorite(false);
+    }
   };
 
   const handleReviewSubmit = async (e) => {
@@ -101,14 +120,19 @@ const MovieDetails = () => {
             </Link>
             <button
               onClick={handleToggleFavorite}
-              className={`flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold transition ${
+              disabled={togglingFavorite}
+              className={`flex items-center gap-2 rounded-xl border px-5 py-3 text-sm font-semibold transition disabled:opacity-60 ${
                 favorited
                   ? "border-pink-500 bg-pink-500/20 text-pink-300"
                   : "border-slate-700 bg-slate-800/80 text-slate-200 hover:border-pink-500"
               }`}
             >
               <Heart className={`h-4 w-4 ${favorited ? "fill-pink-400 text-pink-400" : ""}`} />
-              {favorited ? "Saved in Watchlist" : "Add to Watchlist"}
+              {togglingFavorite
+                ? "Updating..."
+                : favorited
+                ? "Saved in Watchlist"
+                : "Add to Watchlist"}
             </button>
             {movie.trailerUrl && (
               <a
