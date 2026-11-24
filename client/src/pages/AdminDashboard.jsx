@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   Building2,
   CalendarClock,
   CheckCircle2,
   Crown,
   Film,
+  Image,
   Lock,
   MapPin,
   Pencil,
@@ -59,6 +61,7 @@ const AdminDashboard = () => {
   const [theatres, setTheatres] = useState([]);
   const [shows, setShows] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [banners, setBanners] = useState([]);
   const [requests, setRequests] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [cities, setCities] = useState([]);
@@ -73,6 +76,16 @@ const AdminDashboard = () => {
 
   const [newCityName, setNewCityName] = useState("");
   const [newCityState, setNewCityState] = useState("");
+
+  const [bannerForm, setBannerForm] = useState({
+    title: "",
+    subtitle: "",
+    imageUrl: "",
+    movie: "",
+    slideIntervalSec: 5,
+  });
+
+  const [delayInputs, setDelayInputs] = useState({});
 
   const [showForm, setShowForm] = useState({
     movie: "",
@@ -95,21 +108,28 @@ const AdminDashboard = () => {
         return;
       }
 
-      const [m, t, s, b] = await Promise.all([
+      const [m, t, s, b, ban] = await Promise.all([
         api.get("/movies"),
         api.get("/theatres"),
         api.get("/shows"),
         api.get("/bookings"),
+        api.get("/banners").catch(() => ({ data: [] })),
       ]);
       setMovies(m.data);
       setTheatres(t.data);
       setShows(s.data);
       setBookings(b.data);
+      setBanners(ban.data);
 
       setShowForm((prev) => ({
         ...prev,
         movie: prev.movie || m.data[0]?._id || "",
         theatre: prev.theatre || t.data[0]?._id || "",
+      }));
+
+      setBannerForm((prev) => ({
+        ...prev,
+        movie: prev.movie || m.data[0]?._id || "",
       }));
 
       setTheatreForm((prev) => ({
@@ -136,10 +156,9 @@ const AdminDashboard = () => {
 
   const notify = (msg) => {
     setStatusMsg(msg);
-    setTimeout(() => setStatusMsg(""), 4000);
+    setTimeout(() => setStatusMsg(""), 4500);
   };
 
-  // --- Movie Handlers ---
   const handleSaveMovie = async (e) => {
     e.preventDefault();
     if (editingMovieId) {
@@ -171,7 +190,6 @@ const AdminDashboard = () => {
     });
   };
 
-  // --- Theatre Handlers ---
   const handleSaveTheatre = async (e) => {
     e.preventDefault();
     if (!theatreForm.city) {
@@ -206,7 +224,6 @@ const AdminDashboard = () => {
     });
   };
 
-  // --- City Handlers (Manager) ---
   const handleAddCity = async (e) => {
     e.preventDefault();
     if (!newCityName.trim()) return;
@@ -227,7 +244,6 @@ const AdminDashboard = () => {
     loadAll();
   };
 
-  // --- Show Handler ---
   const handleAddShow = async (e) => {
     e.preventDefault();
     await api.post("/shows", showForm);
@@ -235,7 +251,31 @@ const AdminDashboard = () => {
     loadAll();
   };
 
-  // --- Manager Approval Handlers ---
+  const handleApplyDelay = async (showId) => {
+    const entry = delayInputs[showId] || {};
+    const delayMinutes = Number(entry.minutes) || 15;
+    const reason = entry.reason || "Technical/cleaning delay";
+    const { data } = await api.post(`/shows/${showId}/delay`, { delayMinutes, reason });
+    notify(data.message);
+    sessionStorage.removeItem("imovies_shows_cache");
+    loadAll();
+  };
+
+  const handleAddBanner = async (e) => {
+    e.preventDefault();
+    await api.post("/banners", bannerForm);
+    notify("Hero banner published to Home slideshow.");
+    sessionStorage.removeItem("imovies_banners_cache");
+    setBannerForm({
+      title: "",
+      subtitle: "",
+      imageUrl: "",
+      movie: movies[0]?._id || "",
+      slideIntervalSec: 5,
+    });
+    loadAll();
+  };
+
   const handleApproveAdmin = async (id) => {
     const { data } = await api.patch(`/manager/requests/${id}/approve`);
     notify(data.message);
@@ -263,7 +303,7 @@ const AdminDashboard = () => {
           </div>
           <h1 className="text-2xl font-black text-white">Admin Access Pending Approval</h1>
           <p className="mt-2 text-sm text-slate-400">
-            Your Theatre Admin registration is awaiting verification from the Head Manager. Once approved, all movie, theatre, and show controls will unlock here.
+            Your Theatre Admin registration is awaiting verification from the Head Manager.
           </p>
           <button
             onClick={loadAll}
@@ -285,7 +325,6 @@ const AdminDashboard = () => {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
-      {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-black text-white">
@@ -301,11 +340,6 @@ const AdminDashboard = () => {
               </>
             )}
           </h1>
-          <p className="text-xs text-slate-400">
-            {isManager
-              ? "Approve Admins, manage official Cities, edit Movies & Trailers, and oversee Theatres."
-              : "Add or edit Movies, Trailer URLs, Theatres, and Showtimes."}
-          </p>
         </div>
 
         <div className="flex flex-wrap gap-2 text-xs">
@@ -327,7 +361,6 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* Tabs */}
       <div className="mb-6 flex flex-wrap gap-2">
         {isManager && (
           <button
@@ -344,7 +377,8 @@ const AdminDashboard = () => {
         {[
           { id: "movies", label: "Movies & Trailers", icon: Film },
           { id: "theatres", label: "Theatres", icon: Building2 },
-          { id: "shows", label: "Shows", icon: CalendarClock },
+          { id: "shows", label: "Shows & Delay Control", icon: CalendarClock },
+          { id: "banners", label: "Hero Banners", icon: Image },
           { id: "bookings", label: "All Bookings", icon: Ticket },
         ].map((item) => {
           const Icon = item.icon;
@@ -368,10 +402,8 @@ const AdminDashboard = () => {
         <div className="p-12 text-center text-sm text-slate-400">Loading workspace...</div>
       ) : (
         <>
-          {/* TAB 1: MANAGER APPROVALS, SEPARATED TEAM LISTS & CITIES */}
           {tab === "approvals" && isManager && (
             <div className="space-y-8">
-              {/* Pending Admin Requests Only */}
               <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
                 <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-white">
                   <Crown className="h-4 w-4 text-amber-400" />
@@ -379,9 +411,7 @@ const AdminDashboard = () => {
                 </h2>
 
                 {requests.length === 0 ? (
-                  <p className="text-xs text-slate-400">
-                    No pending Admin applications right now. Approved Admins move automatically below.
-                  </p>
+                  <p className="text-xs text-slate-400">No pending Admin applications right now.</p>
                 ) : (
                   <div className="grid gap-4 md:grid-cols-2">
                     {requests.map((reqUser) => (
@@ -389,18 +419,11 @@ const AdminDashboard = () => {
                         key={reqUser._id}
                         className="rounded-2xl border border-amber-500/30 bg-slate-900/90 p-4"
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h3 className="text-sm font-bold text-white">{reqUser.username}</h3>
-                            <p className="text-xs text-slate-400">{reqUser.email}</p>
-                            <p className="mt-1 text-xs text-amber-300">
-                              Theatre: <strong>{reqUser.theatreRequestName || "Not specified"}</strong>
-                            </p>
-                          </div>
-                          <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-300">
-                            Pending
-                          </span>
-                        </div>
+                        <h3 className="text-sm font-bold text-white">{reqUser.username}</h3>
+                        <p className="text-xs text-slate-400">{reqUser.email}</p>
+                        <p className="mt-1 text-xs text-amber-300">
+                          Theatre: <strong>{reqUser.theatreRequestName || "Not specified"}</strong>
+                        </p>
                         <div className="mt-4 flex gap-2">
                           <button
                             onClick={() => handleApproveAdmin(reqUser._id)}
@@ -421,7 +444,6 @@ const AdminDashboard = () => {
                 )}
               </div>
 
-              {/* Manager Official City List */}
               <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
                 <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-white">
                   <MapPin className="h-4 w-4 text-red-400" />
@@ -432,13 +454,13 @@ const AdminDashboard = () => {
                     value={newCityName}
                     onChange={(e) => setNewCityName(e.target.value)}
                     placeholder="City name (e.g., Durgapur, Kolkata)"
-                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white outline-none focus:border-red-500"
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
                   />
                   <input
                     value={newCityState}
                     onChange={(e) => setNewCityState(e.target.value)}
                     placeholder="State (optional)"
-                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white outline-none focus:border-red-500"
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
                   />
                   <button
                     type="submit"
@@ -449,98 +471,79 @@ const AdminDashboard = () => {
                 </form>
 
                 <div className="flex flex-wrap gap-2">
-                  {cities.length === 0 ? (
-                    <span className="text-xs text-slate-500">
-                      No cities added yet. Add cities above so Admins can select them when creating theatres.
-                    </span>
-                  ) : (
-                    cities.map((c) => (
-                      <span
-                        key={c._id}
-                        className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200"
+                  {cities.map((c) => (
+                    <span
+                      key={c._id}
+                      className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs text-slate-200"
+                    >
+                      {c.name}
+                      {c.state ? ` (${c.state})` : ""}
+                      <button
+                        onClick={() => handleDeleteCity(c._id)}
+                        className="text-slate-400 hover:text-red-400"
                       >
-                        {c.name}
-                        {c.state ? ` (${c.state})` : ""}
-                        <button
-                          onClick={() => handleDeleteCity(c._id)}
-                          className="text-slate-400 hover:text-red-400"
-                          title="Remove city"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </span>
-                    ))
-                  )}
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ))}
                 </div>
               </div>
 
-              {/* Separated Active Admins vs Customers */}
               <div className="grid gap-6 lg:grid-cols-2">
-                {/* Active Approved Admins */}
                 <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
                   <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-amber-300">
                     <ShieldCheck className="h-4 w-4" /> Approved Theatre Admins ({activeAdmins.length})
                   </h3>
-                  {activeAdmins.length === 0 ? (
-                    <p className="text-xs text-slate-500">No approved admins yet.</p>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {activeAdmins.map((adm) => (
-                        <div
-                          key={adm._id}
-                          className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/80 p-3"
-                        >
-                          <div>
-                            <p className="text-xs font-bold text-white">{adm.username}</p>
-                            <p className="text-[11px] text-slate-400">{adm.email}</p>
-                            <p className="text-[11px] text-amber-300">Theatre: {adm.theatreName}</p>
-                          </div>
-                          <button
-                            onClick={() => handleChangeUserRole(adm._id, "user")}
-                            className="flex items-center gap-1 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[11px] font-bold text-red-300 hover:bg-red-500/15"
-                          >
-                            <UserMinus className="h-3.5 w-3.5" /> Remove Admin
-                          </button>
+                  <div className="space-y-2.5">
+                    {activeAdmins.map((adm) => (
+                      <div
+                        key={adm._id}
+                        className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/80 p-3"
+                      >
+                        <div>
+                          <p className="text-xs font-bold text-white">{adm.username}</p>
+                          <p className="text-[11px] text-slate-400">{adm.email}</p>
+                          <p className="text-[11px] text-amber-300">Theatre: {adm.theatreName}</p>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        <button
+                          onClick={() => handleChangeUserRole(adm._id, "user")}
+                          className="flex items-center gap-1 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[11px] font-bold text-red-300 hover:bg-red-500/15"
+                        >
+                          <UserMinus className="h-3.5 w-3.5" /> Remove Admin
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Regular Customers */}
                 <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
                   <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-sky-300">
                     <Users className="h-4 w-4" /> Registered Customers ({regularCustomers.length})
                   </h3>
-                  {regularCustomers.length === 0 ? (
-                    <p className="text-xs text-slate-500">No customer accounts yet.</p>
-                  ) : (
-                    <div className="max-h-80 space-y-2.5 overflow-y-auto pr-1">
-                      {regularCustomers.map((cust) => (
-                        <div
-                          key={cust._id}
-                          className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/80 p-3"
-                        >
-                          <div>
-                            <p className="text-xs font-bold text-white">{cust.username}</p>
-                            <p className="text-[11px] text-slate-400">{cust.email}</p>
-                          </div>
-                          <button
-                            onClick={() => handleChangeUserRole(cust._id, "admin")}
-                            className="flex items-center gap-1 rounded-lg border border-amber-500/40 px-2.5 py-1.5 text-[11px] font-bold text-amber-300 hover:bg-amber-500/15"
-                          >
-                            <UserCheck className="h-3.5 w-3.5" /> Make Admin
-                          </button>
+                  <div className="max-h-80 space-y-2.5 overflow-y-auto pr-1">
+                    {regularCustomers.map((cust) => (
+                      <div
+                        key={cust._id}
+                        className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/80 p-3"
+                      >
+                        <div>
+                          <p className="text-xs font-bold text-white">{cust.username}</p>
+                          <p className="text-[11px] text-slate-400">{cust.email}</p>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        <button
+                          onClick={() => handleChangeUserRole(cust._id, "admin")}
+                          className="flex items-center gap-1 rounded-lg border border-amber-500/40 px-2.5 py-1.5 text-[11px] font-bold text-amber-300 hover:bg-amber-500/15"
+                        >
+                          <UserCheck className="h-3.5 w-3.5" /> Make Admin
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
           )}
 
-          {/* TAB 2: MOVIES & TRAILER URL ADD / EDIT */}
           {tab === "movies" && (
             <div className="grid gap-8 lg:grid-cols-[380px,1fr]">
               <form
@@ -583,7 +586,7 @@ const AdminDashboard = () => {
                   <input
                     value={movieForm.genres}
                     onChange={(e) => setMovieForm({ ...movieForm, genres: e.target.value })}
-                    placeholder="Genres (comma separated)"
+                    placeholder="Genres"
                     className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
                   />
                   <input
@@ -628,14 +631,12 @@ const AdminDashboard = () => {
                   placeholder="Banner Image URL"
                   className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
                 />
-                <div className="relative">
-                  <input
-                    value={movieForm.trailerUrl}
-                    onChange={(e) => setMovieForm({ ...movieForm, trailerUrl: e.target.value })}
-                    placeholder="YouTube Trailer URL (https://youtube.com/watch?v=...)"
-                    className="w-full rounded-xl border border-red-500/40 bg-slate-900 px-3 py-2 text-xs text-white"
-                  />
-                </div>
+                <input
+                  value={movieForm.trailerUrl}
+                  onChange={(e) => setMovieForm({ ...movieForm, trailerUrl: e.target.value })}
+                  placeholder="YouTube Trailer URL (https://youtube.com/watch?v=...)"
+                  className="w-full rounded-xl border border-red-500/40 bg-slate-900 px-3 py-2 text-xs text-white"
+                />
                 <input
                   value={movieForm.cast}
                   onChange={(e) => setMovieForm({ ...movieForm, cast: e.target.value })}
@@ -698,7 +699,6 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* TAB 3: THEATRES ADD & EDIT WITH MANAGER CITY LIST */}
           {tab === "theatres" && (
             <div className="grid gap-8 lg:grid-cols-[380px,1fr]">
               <form
@@ -845,7 +845,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* TAB 4: SHOWS */}
+          {/* SHOWS & SMART DELAY AUTO-RECOVERY */}
           {tab === "shows" && (
             <div className="grid gap-8 lg:grid-cols-[360px,1fr]">
               <form
@@ -907,33 +907,169 @@ const AdminDashboard = () => {
                 {shows.map((s) => (
                   <div
                     key={s._id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-[#111827] p-4"
+                    className="rounded-2xl border border-slate-800 bg-[#111827] p-4"
                   >
-                    <div>
-                      <h3 className="text-sm font-bold text-white">
-                        {s.movie?.movieName} — {s.theatre?.theatreName}
-                      </h3>
-                      <p className="text-xs text-slate-400">
-                        {s.screenName} • {s.showdate} at {s.showtime} • Booked:{" "}
-                        {s.bookedSeats?.length || 0} seats
-                      </p>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-white">
+                          {s.movie?.movieName} — {s.theatre?.theatreName}
+                        </h3>
+                        <p className="text-xs text-slate-400">
+                          {s.screenName} • {s.showdate} • Start: {s.effectiveStartTime || s.showtime}{" "}
+                          • Break: {s.breakStartTime}–{s.breakEndTime} ({s.breakDurationMinutes ?? 20}m) • Ends:{" "}
+                          {s.estimatedEndTime}
+                        </p>
+                      </div>
+                      <button
+                        onClick={async () => {
+                          await api.delete(`/shows/${s._id}`);
+                          loadAll();
+                        }}
+                        className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/10"
+                      >
+                        Delete
+                      </button>
                     </div>
-                    <button
-                      onClick={async () => {
-                        await api.delete(`/shows/${s._id}`);
-                        loadAll();
-                      }}
-                      className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/10"
-                    >
-                      Delete
-                    </button>
+
+                    {/* Smart Delay & Break Auto-Recovery Controls */}
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3">
+                      <AlertTriangle className="h-4 w-4 text-amber-400" />
+                      <input
+                        type="number"
+                        min="5"
+                        max="180"
+                        placeholder="Delay mins (e.g. 20)"
+                        value={delayInputs[s._id]?.minutes || ""}
+                        onChange={(e) =>
+                          setDelayInputs({
+                            ...delayInputs,
+                            [s._id]: { ...delayInputs[s._id], minutes: e.target.value },
+                          })
+                        }
+                        className="w-36 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs text-white"
+                      />
+                      <input
+                        placeholder="Reason (e.g. Projector check)"
+                        value={delayInputs[s._id]?.reason || ""}
+                        onChange={(e) =>
+                          setDelayInputs({
+                            ...delayInputs,
+                            [s._id]: { ...delayInputs[s._id], reason: e.target.value },
+                          })
+                        }
+                        className="flex-1 rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1 text-xs text-white"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleApplyDelay(s._id)}
+                        className="rounded-lg bg-amber-500 px-3 py-1 text-xs font-bold text-slate-950 hover:bg-amber-400"
+                      >
+                        Apply Delay & Auto-Adjust Breaks
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* TAB 5: ALL BOOKINGS */}
+          {/* HERO BANNER SLIDESHOW MANAGER */}
+          {tab === "banners" && (
+            <div className="grid gap-8 lg:grid-cols-[360px,1fr]">
+              <form
+                onSubmit={handleAddBanner}
+                className="h-fit space-y-3 rounded-3xl border border-slate-800 bg-[#111827] p-6"
+              >
+                <h2 className="text-base font-bold text-white">Add Hero Slideshow Banner</h2>
+                <input
+                  required
+                  value={bannerForm.title}
+                  onChange={(e) => setBannerForm({ ...bannerForm, title: e.target.value })}
+                  placeholder="Banner Headline"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
+                />
+                <input
+                  value={bannerForm.subtitle}
+                  onChange={(e) => setBannerForm({ ...bannerForm, subtitle: e.target.value })}
+                  placeholder="Subtitle / Offer Tagline"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
+                />
+                <input
+                  required
+                  value={bannerForm.imageUrl}
+                  onChange={(e) => setBannerForm({ ...bannerForm, imageUrl: e.target.value })}
+                  placeholder="Banner Image URL"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
+                />
+                <div>
+                  <label className="mb-1 block text-[11px] text-slate-400">
+                    Redirect Movie When Clicked
+                  </label>
+                  <select
+                    required
+                    value={bannerForm.movie}
+                    onChange={(e) => setBannerForm({ ...bannerForm, movie: e.target.value })}
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
+                  >
+                    {movies.map((m) => (
+                      <option key={m._id} value={m._id}>
+                        {m.movieName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] text-slate-400">
+                    Slide Movement Interval (Seconds)
+                  </label>
+                  <input
+                    type="number"
+                    min="2"
+                    max="30"
+                    value={bannerForm.slideIntervalSec}
+                    onChange={(e) =>
+                      setBannerForm({ ...bannerForm, slideIntervalSec: Number(e.target.value) })
+                    }
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-red-600 py-2.5 text-xs font-bold text-white hover:bg-red-700"
+                >
+                  Publish Banner Slide
+                </button>
+              </form>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {banners.map((b) => (
+                  <div
+                    key={b._id}
+                    className="overflow-hidden rounded-2xl border border-slate-800 bg-[#111827]"
+                  >
+                    <img src={b.imageUrl} alt={b.title} className="h-36 w-full object-cover" />
+                    <div className="p-4">
+                      <h3 className="text-sm font-bold text-white">{b.title}</h3>
+                      <p className="text-xs text-slate-400">
+                        Links to: {b.movie?.movieName || "Movie"} • Slide time: {b.slideIntervalSec}s
+                      </p>
+                      <button
+                        onClick={async () => {
+                          await api.delete(`/banners/${b._id}`);
+                          sessionStorage.removeItem("imovies_banners_cache");
+                          loadAll();
+                        }}
+                        className="mt-3 rounded-lg border border-red-500/30 px-3 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/10"
+                      >
+                        Remove Banner
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {tab === "bookings" && (
             <div className="space-y-3">
               {bookings.map((b) => (
