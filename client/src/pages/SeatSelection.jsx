@@ -121,7 +121,7 @@ const SeatSelection = () => {
         seats: selectedSeats,
         promoCode: code,
       });
-      setPaymentOrder(data);
+      setPaymentOrder(data.order || data);
     } catch (err) {
       setError(err.response?.data?.message || "Could not initialize payment order");
     } finally {

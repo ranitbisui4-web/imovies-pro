@@ -114,6 +114,9 @@ const PaymentGatewayModal = ({ order, onClose, onSuccess }) => {
 
       const { data } = await api.post("/payments/verify", {
         orderId: order.orderId,
+        showId: order.showId,
+        seats: order.seats,
+        totalAmount: order.totalAmount,
         paymentMethod: method,
         paymentDetails: buildPaymentDetails(),
       });

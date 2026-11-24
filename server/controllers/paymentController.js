@@ -2,6 +2,17 @@ const crypto = require("crypto");
 const Show = require("../models/Show");
 const Booking = require("../models/Booking");
 
+const CONVENIENCE_FEE_PER_SEAT = 25;
+const GST_RATE = 0.18;
+
+const getSeatPrice = (seatId, theatre) => {
+  if (!theatre) return 200;
+  const code = String(seatId || "").toUpperCase();
+  if (code.startsWith("B")) return Number(theatre.balconySeatPrice ?? theatre.price ?? 250);
+  if (code.startsWith("M")) return Number(theatre.middleSeatPrice ?? theatre.price ?? 180);
+  return Number(theatre.lowerSeatPrice ?? theatre.price ?? 120);
+};
+
 const createPaymentOrder = async (req, res) => {
   try {
     const { showId, seats, promoCode } = req.body;
@@ -21,42 +32,49 @@ const createPaymentOrder = async (req, res) => {
       return res.status(409).json({ message: `Seat ${conflict} is already booked.` });
     }
 
-    const basePrice = Number(show.price || show.ticketPrice || 200);
-    const subtotal = basePrice * seats.length;
-    const convenienceFee = Math.round(subtotal * 0.1);
-    const gst = Math.round((subtotal + convenienceFee) * 0.18);
-    const discount =
-      promoCode && String(promoCode).toUpperCase() === "IMOVIES10"
-        ? Math.round(subtotal * 0.1)
-        : 0;
-    const totalAmount = Math.max(1, subtotal + convenienceFee + gst - discount);
+    const subtotal = seats.reduce((sum, seat) => sum + getSeatPrice(seat, show.theatre), 0);
+    const convenienceFee = seats.length * CONVENIENCE_FEE_PER_SEAT;
+    const gst = Math.round(convenienceFee * GST_RATE);
+
+    const normalizedCode = String(promoCode || "").trim().toUpperCase();
+    let discount = 0;
+    if (normalizedCode === "IMOVIES20") {
+      discount = Math.round(subtotal * 0.2);
+    } else if (normalizedCode === "FIRST50") {
+      discount = Math.min(50, subtotal);
+    } else if (normalizedCode === "IMOVIES10") {
+      discount = Math.round(subtotal * 0.1);
+    }
+
+    const totalAmount = Math.max(0, subtotal + convenienceFee + gst - discount);
 
     const orderId = `ORD-${crypto.randomBytes(4).toString("hex").toUpperCase()}`;
     const merchantVpa = process.env.MERCHANT_UPI_ID || "imoviespro@okaxis";
-    const movieTitle = show.movie?.title || "Movie";
-    const theatreName = show.theatre?.name || "Cinema Hall";
+    const movieTitle = show.movie?.movieName || show.movie?.title || "Movie";
+    const theatreName = show.theatre?.theatreName || show.theatre?.name || "Cinema Hall";
     const upiUri = `upi://pay?pa=${encodeURIComponent(merchantVpa)}&pn=${encodeURIComponent(
       "iMovies Pro"
     )}&am=${totalAmount}&cu=INR&tn=${encodeURIComponent(`${orderId} - ${movieTitle}`)}`;
 
-    return res.status(201).json({
-      order: {
-        orderId,
-        showId: show._id,
-        movieTitle,
-        theatreName,
-        showTime: show.showTime || show.time || "",
-        seats,
-        subtotal,
-        convenienceFee,
-        gst,
-        discount,
-        promoCode: discount > 0 ? String(promoCode).toUpperCase() : null,
-        totalAmount,
-        merchantVpa,
-        upiUri,
-      },
-    });
+    const order = {
+      orderId,
+      showId: show._id,
+      movieTitle,
+      theatreName,
+      showDate: show.showdate || "",
+      showTime: show.showtime || show.time || "",
+      seats,
+      subtotal,
+      convenienceFee,
+      gst,
+      discount,
+      promoCode: discount > 0 ? normalizedCode : null,
+      totalAmount,
+      merchantVpa,
+      upiUri,
+    };
+
+    return res.status(201).json({ order, ...order });
   } catch (err) {
     console.error("createPaymentOrder error:", err);
     return res.status(500).json({ message: "Failed to initialize payment order." });
