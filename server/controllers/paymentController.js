@@ -229,15 +229,30 @@ const verifyPayment = async (req, res) => {
       return res.status(409).json({ message: `Seat ${alreadyTaken} was just booked by another user.` });
     }
 
+    // Atomic seat lock: guarantees only one concurrent request claims these seats
+    const updatedShow = await Show.findOneAndUpdate(
+      {
+        _id: showId,
+        bookedSeats: { $nin: seats },
+      },
+      {
+        $addToSet: { bookedSeats: { $each: seats } },
+        $pull: { lockedSeats: { seatId: { $in: seats } } },
+      },
+      { new: true }
+    );
+
+    if (!updatedShow) {
+      return res.status(409).json({
+        message: "One or more selected seats were just booked by another user. Please pick different seats.",
+      });
+    }
+
     const pricing = calculateBreakdown(seats, show.theatre, promoCode);
     const finalTotalPrice =
       totalAmount !== undefined && totalAmount !== null
         ? Number(totalAmount)
         : pricing.totalAmount;
-
-    show.bookedSeats = Array.from(new Set([...(show.bookedSeats || []), ...seats]));
-    show.lockedSeats = (show.lockedSeats || []).filter((l) => !seats.includes(l.seatId));
-    await show.save();
 
     const bookingId =
       orderId && String(orderId).startsWith("IMV-")
@@ -268,8 +283,8 @@ const verifyPayment = async (req, res) => {
     if (io) {
       io.to(`show:${show._id}`).emit("seats_updated", {
         showId: String(show._id),
-        bookedSeats: show.bookedSeats,
-        lockedSeats: show.lockedSeats || [],
+        bookedSeats: updatedShow.bookedSeats,
+        lockedSeats: updatedShow.lockedSeats || [],
       });
     }
 
