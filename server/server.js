@@ -17,6 +17,7 @@ const aiRoutes = require("./routes/aiRoutes");
 
 const app = express();
 const server = http.createServer(app);
+const paymentRoutes = require("./routes/paymentRoutes");
 
 const io = new Server(server, {
   cors: {
@@ -40,6 +41,7 @@ app.use("/api/bookings", bookingRoutes);
 app.use("/api/favorites", favoriteRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/payments", paymentRoutes);
 
 // Real-Time Socket.io Seat Locking
 io.on("connection", (socket) => {
