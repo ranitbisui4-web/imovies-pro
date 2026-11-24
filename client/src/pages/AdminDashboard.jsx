@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   Trash2,
   PlusCircle,
+  Pencil,
   Film,
   Building2,
   CalendarClock,
@@ -10,9 +11,24 @@ import {
   CheckCircle2,
   XCircle,
   Users,
+  UserMinus,
 } from "lucide-react";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
+
+const emptyMovieForm = {
+  movieName: "",
+  description: "",
+  genres: "Action, Thriller",
+  language: "Hindi / English",
+  releaseDate: "2026-12-01",
+  runtime: 150,
+  certification: "U/A",
+  rating: 8.5,
+  posterUrl:
+    "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=600&q=80",
+  trailerUrl: "",
+};
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -28,19 +44,8 @@ const AdminDashboard = () => {
   const [allUsers, setAllUsers] = useState([]);
   const [feedback, setFeedback] = useState("");
 
-  const [movieForm, setMovieForm] = useState({
-    movieName: "",
-    description: "",
-    genres: "Action, Thriller",
-    language: "Hindi / English",
-    releaseDate: "2026-12-01",
-    runtime: 150,
-    certification: "U/A",
-    rating: 8.5,
-    posterUrl:
-      "https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&fit=crop&w=600&q=80",
-    trailerUrl: "",
-  });
+  const [editingMovieId, setEditingMovieId] = useState(null);
+  const [movieForm, setMovieForm] = useState(emptyMovieForm);
 
   const [theatreForm, setTheatreForm] = useState({
     theatreName: "",
@@ -119,11 +124,39 @@ const AdminDashboard = () => {
     .filter((b) => b.status === "CONFIRMED")
     .reduce((sum, b) => sum + b.totalPrice, 0);
 
-  const handleAddMovie = async (e) => {
+  const handleStartEditMovie = (m) => {
+    setEditingMovieId(m._id);
+    setMovieForm({
+      movieName: m.movieName || "",
+      description: m.description || "",
+      genres: Array.isArray(m.genres) ? m.genres.join(", ") : m.genres || "",
+      language: m.language || "Hindi / English",
+      releaseDate: m.releaseDate ? new Date(m.releaseDate).toISOString().split("T")[0] : "2026-12-01",
+      runtime: m.runtime || 150,
+      certification: m.certification || "U/A",
+      rating: m.rating ?? 8.5,
+      posterUrl: m.posterUrl || emptyMovieForm.posterUrl,
+      trailerUrl: m.trailerUrl || "",
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMovieId(null);
+    setMovieForm(emptyMovieForm);
+  };
+
+  const handleSaveMovie = async (e) => {
     e.preventDefault();
-    await api.post("/movies", movieForm);
-    setMovieForm({ ...movieForm, movieName: "", description: "" });
-    showToast("Movie added successfully.");
+    if (editingMovieId) {
+      await api.put(`/movies/${editingMovieId}`, movieForm);
+      setEditingMovieId(null);
+      setMovieForm(emptyMovieForm);
+      showToast("Movie updated successfully.");
+    } else {
+      await api.post("/movies", movieForm);
+      setMovieForm(emptyMovieForm);
+      showToast("Movie added successfully.");
+    }
     refreshAll();
   };
 
@@ -192,8 +225,8 @@ const AdminDashboard = () => {
           </h1>
           <p className="mt-1 text-xs text-slate-400">
             {isManager
-              ? "Approve new Admins & Managers, manage team permissions, and oversee cinema operations."
-              : "Manage movies, theatres, shows, and customer bookings."}
+              ? "Approve or remove Admins, view their theatres, add/edit movies, and oversee bookings."
+              : "Add or edit movies, manage theatres and shows, and view bookings."}
           </p>
         </div>
 
@@ -242,12 +275,12 @@ const AdminDashboard = () => {
           <div>
             <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-white">
               <Crown className="h-5 w-5 text-amber-400" />
-              Pending Admin & Manager Requests ({pendingRequests.length})
+              Pending Admin Requests ({pendingRequests.length})
             </h2>
 
             {pendingRequests.length === 0 ? (
               <div className="rounded-2xl border border-slate-800 bg-[#111827] p-8 text-center text-sm text-slate-400">
-                No pending Admin or Manager approval requests right now.
+                No pending Admin approval requests right now.
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
@@ -259,17 +292,14 @@ const AdminDashboard = () => {
                     <div>
                       <div className="flex items-center justify-between gap-2">
                         <h3 className="font-bold text-white">{reqUser.username}</h3>
-                        <span
-                          className={`rounded-full px-2.5 py-0.5 text-[10px] font-extrabold uppercase ${
-                            reqUser.requestedRole === "manager"
-                              ? "bg-purple-500/20 text-purple-300"
-                              : "bg-amber-500/20 text-amber-300"
-                          }`}
-                        >
-                          Requesting: {reqUser.requestedRole}
+                        <span className="rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-extrabold uppercase text-amber-300">
+                          Requesting: Admin
                         </span>
                       </div>
                       <p className="mt-1 text-xs text-slate-400">{reqUser.email}</p>
+                      <p className="mt-1 text-xs text-amber-200">
+                        Theatre: <strong>{reqUser.theatreRequestName || "Not specified"}</strong>
+                      </p>
                       <p className="mt-2 text-[11px] text-slate-500">
                         Applied on {new Date(reqUser.createdAt).toLocaleString()}
                       </p>
@@ -281,7 +311,7 @@ const AdminDashboard = () => {
                         className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2 text-xs font-bold text-white hover:bg-emerald-500"
                       >
                         <CheckCircle2 className="h-4 w-4" />
-                        Approve as {reqUser.requestedRole.toUpperCase()}
+                        Approve Admin
                       </button>
                       <button
                         onClick={() => handleReject(reqUser._id)}
@@ -299,16 +329,16 @@ const AdminDashboard = () => {
           <div>
             <h2 className="mb-3 flex items-center gap-2 text-lg font-bold text-white">
               <Users className="h-5 w-5 text-red-500" />
-              All Accounts & Role Directory ({allUsers.length})
+              All Accounts, Admin Theatres & Role Control ({allUsers.length})
             </h2>
             <div className="overflow-x-auto rounded-2xl border border-slate-800 bg-[#111827]">
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-slate-800 text-xs uppercase text-slate-400">
                   <tr>
                     <th className="px-4 py-3">User</th>
-                    <th className="px-4 py-3">Current Role</th>
-                    <th className="px-4 py-3">Approved By</th>
-                    <th className="px-4 py-3 text-right">Manage Role</th>
+                    <th className="px-4 py-3">Role</th>
+                    <th className="px-4 py-3">Theatre</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/70">
@@ -331,12 +361,12 @@ const AdminDashboard = () => {
                           {u.role}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-400">
-                        {u.approvedBy?.username || (u.role === "manager" ? "System Bootstrap" : "—")}
+                      <td className="px-4 py-3 text-xs text-slate-300">
+                        {u.theatreName || u.theatreRequestName || "—"}
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="inline-flex gap-1.5">
-                          {u.role !== "admin" && (
+                          {u.role !== "admin" && u.role !== "manager" && (
                             <button
                               onClick={() => handleDirectRoleChange(u._id, "admin")}
                               className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-300 hover:bg-amber-500/20"
@@ -344,20 +374,12 @@ const AdminDashboard = () => {
                               Make Admin
                             </button>
                           )}
-                          {u.role !== "manager" && (
-                            <button
-                              onClick={() => handleDirectRoleChange(u._id, "manager")}
-                              className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-xs font-semibold text-purple-300 hover:bg-purple-500/20"
-                            >
-                              Make Manager
-                            </button>
-                          )}
-                          {u.role !== "user" && (
+                          {u.role === "admin" && (
                             <button
                               onClick={() => handleDirectRoleChange(u._id, "user")}
-                              className="rounded-lg border border-slate-700 bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-300 hover:border-red-500 hover:text-red-400"
+                              className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/20"
                             >
-                              Revoke
+                              <UserMinus className="h-3.5 w-3.5" /> Remove Admin
                             </button>
                           )}
                         </div>
@@ -371,13 +393,32 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* MOVIES TAB */}
+      {/* MOVIES TAB (Add + Edit for both Admin and Manager) */}
       {tab === "movies" && (
         <div className="grid gap-6 lg:grid-cols-[360px,1fr]">
-          <form onSubmit={handleAddMovie} className="space-y-3 rounded-2xl border border-slate-800 bg-[#111827] p-5">
-            <h2 className="flex items-center gap-2 font-bold text-white">
-              <PlusCircle className="h-4 w-4 text-red-500" /> Add Movie
-            </h2>
+          <form onSubmit={handleSaveMovie} className="space-y-3 rounded-2xl border border-slate-800 bg-[#111827] p-5">
+            <div className="flex items-center justify-between">
+              <h2 className="flex items-center gap-2 font-bold text-white">
+                {editingMovieId ? (
+                  <>
+                    <Pencil className="h-4 w-4 text-amber-400" /> Edit Movie
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle className="h-4 w-4 text-red-500" /> Add Movie
+                  </>
+                )}
+              </h2>
+              {editingMovieId && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="text-xs text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
             <input
               required
               placeholder="Movie Name"
@@ -421,7 +462,7 @@ const AdminDashboard = () => {
               className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
             />
             <button className="w-full rounded-lg bg-red-600 py-2.5 text-sm font-bold text-white hover:bg-red-700">
-              Add Movie
+              {editingMovieId ? "Save Movie Changes" : "Add Movie"}
             </button>
           </form>
 
@@ -438,15 +479,27 @@ const AdminDashboard = () => {
                     <p className="text-xs text-slate-400">{m.genres.join(", ")}</p>
                   </div>
                 </div>
-                <button
-                  onClick={async () => {
-                    await api.delete(`/movies/${m._id}`);
-                    refreshAll();
-                  }}
-                  className="rounded-lg p-2 text-slate-400 hover:bg-red-500/20 hover:text-red-400"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleStartEditMovie(m)}
+                    title="Edit Movie"
+                    className="rounded-lg p-2 text-slate-400 hover:bg-amber-500/20 hover:text-amber-300"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await api.delete(`/movies/${m._id}`);
+                      refreshAll();
+                    }}
+                    title="Delete Movie"
+                    className="rounded-lg p-2 text-slate-400 hover:bg-red-500/20 hover:text-red-400"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
             ))}
           </div>

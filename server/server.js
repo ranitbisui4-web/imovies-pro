@@ -7,6 +7,7 @@ const connectDB = require("./config/db");
 const Show = require("./models/Show");
 
 const authRoutes = require("./routes/authRoutes");
+const managerRoutes = require("./routes/managerRoutes");
 const movieRoutes = require("./routes/movieRoutes");
 const theatreRoutes = require("./routes/theatreRoutes");
 const showRoutes = require("./routes/showRoutes");
@@ -14,6 +15,7 @@ const bookingRoutes = require("./routes/bookingRoutes");
 const favoriteRoutes = require("./routes/favoriteRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const aiRoutes = require("./routes/aiRoutes");
+
 
 const app = express();
 const server = http.createServer(app);
@@ -34,6 +36,7 @@ app.use(express.json());
 // Routes
 app.get("/api/health", (req, res) => res.json({ status: "ok", app: "iMovies Pro API" }));
 app.use("/api/auth", authRoutes);
+app.use("/api/manager", managerRoutes);
 app.use("/api/movies", movieRoutes);
 app.use("/api/theatres", theatreRoutes);
 app.use("/api/shows", showRoutes);
