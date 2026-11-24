@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -10,9 +10,11 @@ import {
   Sparkles,
   LogOut,
   LogIn,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useAIControl } from "../context/AIControlContext";
+import api from "../services/api";
 
 const getScreenLabel = (pathname) => {
   if (pathname === "/") return "Home Catalog";
@@ -33,7 +35,49 @@ const Navbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const [notifications, setNotifications] = useState([]);
+  const [notifOpen, setNotifOpen] = useState(false);
+
   const isHome = location.pathname === "/";
+
+  const fetchNotifications = async () => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const { data } = await api.get("/notifications");
+      setNotifications(Array.isArray(data) ? data : []);
+    } catch {
+      // ignore transient error
+    }
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+  }, [user, location.pathname]);
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  const handleMarkRead = async (id) => {
+    try {
+      await api.patch(`/notifications/${id}/read`);
+      setNotifications((prev) =>
+        prev.map((n) => (n._id === id ? { ...n, read: true } : n))
+      );
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleMarkAllRead = async () => {
+    try {
+      await api.patch("/notifications/read-all");
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    } catch {
+      // ignore
+    }
+  };
 
   const handleGoHome = () => {
     setMovieFilters({ search: "", genre: "All" });
@@ -92,7 +136,7 @@ const Navbar = () => {
           </span>
         </div>
 
-        {/* Right: Navigation Links & AI Button */}
+        {/* Right: Navigation Links, Notifications & AI Button */}
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsOpen(!isOpen)}
@@ -108,6 +152,62 @@ const Navbar = () => {
 
           {user && (
             <>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNotifOpen((o) => !o);
+                    fetchNotifications();
+                  }}
+                  title="Notifications"
+                  className="relative flex items-center rounded-lg border border-slate-700 bg-slate-800/70 p-2 text-slate-200 hover:border-red-500 hover:text-white"
+                >
+                  <Bell className="h-4 w-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute -right-1 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white">
+                      {unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {notifOpen && (
+                  <div className="absolute right-0 mt-2 w-80 rounded-2xl border border-slate-800 bg-[#111827] p-3 shadow-2xl">
+                    <div className="mb-2 flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="text-xs font-bold text-white">Notifications</span>
+                      {unreadCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleMarkAllRead}
+                          className="text-[11px] font-semibold text-red-400 hover:underline"
+                        >
+                          Mark all read
+                        </button>
+                      )}
+                    </div>
+                    {notifications.length === 0 ? (
+                      <p className="py-4 text-center text-xs text-slate-400">No notifications yet.</p>
+                    ) : (
+                      <div className="max-h-72 space-y-2 overflow-y-auto">
+                        {notifications.map((n) => (
+                          <div
+                            key={n._id}
+                            onClick={() => handleMarkRead(n._id)}
+                            className={`cursor-pointer rounded-xl border p-2.5 text-xs transition ${
+                              n.read
+                                ? "border-slate-800/70 bg-slate-900/40 text-slate-400"
+                                : "border-amber-500/30 bg-amber-500/10 text-slate-100"
+                            }`}
+                          >
+                            <p className="font-bold">{n.title}</p>
+                            <p className="mt-0.5 text-[11px] text-slate-300">{n.message}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <Link
                 to="/favorites"
                 className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"

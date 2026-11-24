@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
 const Theatre = require("../models/Theatre");
+const Notification = require("../models/Notification");
 const { protect, managerOnly } = require("../middlewares/authMiddleware");
 const { getAdminRequests, approveAdmin, rejectAdmin } = require("../controllers/authController");
 
@@ -21,7 +22,7 @@ router.get("/users", protect, managerOnly, async (req, res) => {
         .map((t) => t.theatreName);
       return {
         ...obj,
-        theatreName: obj.theatreRequestName || matchedTheatres.join(", ") || "—",
+        theatreName: obj.theatreRequestName || matchedTheatres.join(", ") || "-",
       };
     });
 
@@ -40,6 +41,9 @@ router.patch("/users/:id/role", protect, managerOnly, async (req, res) => {
     if (!["user", "admin", "manager"].includes(role)) {
       return res.status(400).json({ message: "Invalid role" });
     }
+    const existingUser = await User.findById(req.params.id);
+    if (!existingUser) return res.status(404).json({ message: "User not found" });
+
     const updated = await User.findByIdAndUpdate(
       req.params.id,
       {
@@ -49,7 +53,24 @@ router.patch("/users/:id/role", protect, managerOnly, async (req, res) => {
       { new: true }
     ).select("-password");
 
-    if (!updated) return res.status(404).json({ message: "User not found" });
+    if (existingUser.role === "admin" && role === "user") {
+      await Notification.create({
+        recipientRole: "admin",
+        recipientUser: updated._id,
+        type: "admin_removed",
+        title: "Admin Access Removed",
+        message: "Your Admin privileges were removed by the Manager. Your account is now a Customer account.",
+      });
+    } else if (role === "admin") {
+      await Notification.create({
+        recipientRole: "admin",
+        recipientUser: updated._id,
+        type: "admin_approved",
+        title: "Promoted to Admin",
+        message: "You have been granted Theatre Admin privileges by the Manager.",
+      });
+    }
+
     res.json({
       message:
         role === "user"

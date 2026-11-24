@@ -1,4 +1,5 @@
 const Movie = require("../models/Movie");
+const Notification = require("../models/Notification");
 
 exports.getMovies = async (req, res) => {
   try {
@@ -44,6 +45,15 @@ exports.addMovie = async (req, res) => {
       body.cast = body.cast.split(",").map((c) => c.trim()).filter(Boolean);
     }
     const movie = await Movie.create(body);
+
+    await Notification.create({
+      recipientRole: "user",
+      recipientUser: null,
+      type: "new_movie",
+      title: "New Movie Arrived",
+      message: `${movie.movieName} is now available to browse and book shows.`,
+    });
+
     res.status(201).json(movie);
   } catch (err) {
     res.status(400).json({ message: err.message });

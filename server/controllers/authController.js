@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const Notification = require("../models/Notification");
 
 const signToken = (user) =>
   jwt.sign(
@@ -30,7 +31,6 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Email is already registered" });
     }
 
-    // Never allow self-registration as 'manager'; 'admin' starts unapproved until Manager approves
     const requestedRole = role === "admin" ? "admin" : "user";
     const isApproved = requestedRole === "user";
 
@@ -44,6 +44,18 @@ exports.register = async (req, res) => {
       isApproved,
       theatreRequestName: requestedRole === "admin" ? theatreRequestName || "" : "",
     });
+
+    if (requestedRole === "admin") {
+      await Notification.create({
+        recipientRole: "manager",
+        recipientUser: null,
+        type: "pending_admin",
+        title: "Admin Approval Due",
+        message: `${username} (${email.toLowerCase()}) requested Admin access${
+          theatreRequestName ? ` for ${theatreRequestName}` : ""
+        }.`,
+      });
+    }
 
     const token = signToken(user);
     res.status(201).json({
@@ -95,7 +107,6 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// Manager-only endpoints for Admin Approval
 exports.getAdminRequests = async (req, res) => {
   try {
     const admins = await User.find({ role: "admin" })
@@ -115,6 +126,17 @@ exports.approveAdmin = async (req, res) => {
       { new: true }
     ).select("-password");
     if (!user) return res.status(404).json({ message: "Admin applicant not found" });
+
+    await Notification.create({
+      recipientRole: "admin",
+      recipientUser: user._id,
+      type: "admin_approved",
+      title: "Admin Request Approved",
+      message: `Your Admin account${
+        user.theatreRequestName ? ` for ${user.theatreRequestName}` : ""
+      } has been approved by the Manager.`,
+    });
+
     res.json({ message: `${user.username} approved as Admin`, user: formatUser(user) });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -129,6 +151,15 @@ exports.rejectAdmin = async (req, res) => {
       { new: true }
     ).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
+
+    await Notification.create({
+      recipientRole: "admin",
+      recipientUser: user._id,
+      type: "admin_removed",
+      title: "Admin Request Rejected",
+      message: "Your Admin request was declined by the Manager. Your account is set to Customer.",
+    });
+
     res.json({ message: `Admin request rejected; converted to Customer`, user: formatUser(user) });
   } catch (err) {
     res.status(500).json({ message: err.message });
