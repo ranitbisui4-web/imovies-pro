@@ -10,6 +10,27 @@ import PaymentGatewayModal from "../components/PaymentGatewayModal";
 const CONVENIENCE_FEE_PER_SEAT = 25;
 const GST_RATE = 0.18;
 
+const loadRazorpayScript = () =>
+  new Promise((resolve) => {
+    if (window.Razorpay) {
+      resolve(true);
+      return;
+    }
+    const existing = document.getElementById("razorpay-checkout-js");
+    if (existing) {
+      existing.addEventListener("load", () => resolve(true));
+      existing.addEventListener("error", () => resolve(false));
+      return;
+    }
+    const script = document.createElement("script");
+    script.id = "razorpay-checkout-js";
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+
 const SeatSelection = () => {
   const { showId } = useParams();
   const navigate = useNavigate();
@@ -51,7 +72,6 @@ const SeatSelection = () => {
     };
   }, [showId]);
 
-  // Apply AI auto-selected seats if directed here by AI Concierge
   useEffect(() => {
     if (aiSeatCommand && aiSeatCommand.showId === showId && show) {
       const validSeats = aiSeatCommand.seats.filter((s) => !show.bookedSeats.includes(s));
@@ -103,8 +123,63 @@ const SeatSelection = () => {
   const gst = Math.round(convenienceFee * GST_RATE);
   const code = promoCode.trim().toUpperCase();
   const discount =
-    code === "IMOVIES20" ? Math.round(subtotal * 0.2) : code === "FIRST50" ? Math.min(50, subtotal) : 0;
+    code === "IMOVIES20"
+      ? Math.round(subtotal * 0.2)
+      : code === "FIRST50"
+      ? Math.min(50, subtotal)
+      : 0;
   const total = Math.max(0, subtotal + convenienceFee + gst - discount);
+
+  const openRazorpayCheckout = async (orderData) => {
+    const scriptLoaded = await loadRazorpayScript();
+    if (!scriptLoaded || !window.Razorpay) {
+      setPaymentOrder(orderData);
+      return;
+    }
+
+    const rzpOptions = {
+      key: orderData.razorpayKeyId,
+      amount: orderData.amountPaise || orderData.totalAmount * 100,
+      currency: orderData.currency || "INR",
+      name: "iMovies Pro",
+      description: `${orderData.movieTitle} • ${orderData.seats.join(", ")}`,
+      order_id: orderData.razorpayOrderId,
+      prefill: {
+        name: user?.username || "",
+        email: user?.email || "",
+        contact: user?.phone || "",
+      },
+      theme: {
+        color: "#dc2626",
+      },
+      handler: async (response) => {
+        try {
+          const { data: verified } = await api.post("/payments/verify", {
+            orderId: orderData.localOrderId || orderData.orderId,
+            showId,
+            seats: orderData.seats,
+            totalAmount: orderData.totalAmount,
+            promoCode: orderData.promoCode,
+            paymentMethod: "RAZORPAY",
+            razorpay_order_id: response.razorpay_order_id,
+            razorpay_payment_id: response.razorpay_payment_id,
+            razorpay_signature: response.razorpay_signature,
+          });
+          navigate("/bookings", { state: { newBooking: verified.booking } });
+        } catch (verifyErr) {
+          setError(verifyErr.response?.data?.message || "Payment verification failed");
+        }
+      },
+      modal: {
+        ondismiss: () => {
+          setError("Razorpay payment cancelled.");
+        },
+      },
+    };
+
+    const rzp = new window.Razorpay(rzpOptions);
+    rzp.open();
+  };
 
   const handleProceedToPayment = async () => {
     if (!user) {
@@ -121,7 +196,12 @@ const SeatSelection = () => {
         seats: selectedSeats,
         promoCode: code,
       });
-      setPaymentOrder(data.order || data);
+      const orderData = data.order || data;
+      if (orderData.razorpayOrderId && orderData.razorpayKeyId) {
+        await openRazorpayCheckout(orderData);
+      } else {
+        setPaymentOrder(orderData);
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Could not initialize payment order");
     } finally {
@@ -139,7 +219,6 @@ const SeatSelection = () => {
           </p>
         </div>
 
-        {/* Legend */}
         <div className="flex flex-wrap gap-4 text-xs text-slate-300">
           <span className="flex items-center gap-1.5">
             <span className="h-4 w-4 rounded border border-slate-600 bg-slate-800" /> Available
@@ -157,7 +236,6 @@ const SeatSelection = () => {
       </div>
 
       <div className="grid gap-8 lg:grid-cols-[1fr,360px]">
-        {/* Seat Layout */}
         <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
           <div className="mx-auto mb-8 max-w-md">
             <div className="h-2 rounded-full bg-gradient-to-r from-transparent via-red-500 to-transparent shadow-[0_0_25px_rgba(239,68,68,0.8)]" />
@@ -207,7 +285,6 @@ const SeatSelection = () => {
           </div>
         </div>
 
-        {/* Checkout Sidebar */}
         <div className="h-fit rounded-3xl border border-slate-800 bg-[#111827] p-6">
           <h2 className="text-lg font-bold text-white">Booking Summary</h2>
 
@@ -246,7 +323,6 @@ const SeatSelection = () => {
             </div>
           </div>
 
-          {/* Promo Code */}
           <div className="mt-5">
             <label className="mb-1.5 flex items-center gap-1 text-xs font-semibold text-slate-400">
               <Tag className="h-3.5 w-3.5" /> Promo Code (IMOVIES20 / FIRST50)
@@ -268,14 +344,14 @@ const SeatSelection = () => {
           >
             <ShieldCheck className="h-4 w-4" />
             {creatingOrder
-              ? "Opening Secure Checkout..."
+              ? "Opening Razorpay Checkout..."
               : user
-              ? `Proceed to Pay ₹${total}`
+              ? `Pay with Razorpay ₹${total}`
               : "Sign In to Book"}
           </button>
 
           <p className="mt-2.5 text-center text-[11px] text-slate-500">
-            Supports UPI QR, GPay, PhonePe, Cards, Net Banking & Wallets
+            Powered by Razorpay Test Checkout (UPI, Cards, Net Banking, Wallets)
           </p>
         </div>
       </div>
