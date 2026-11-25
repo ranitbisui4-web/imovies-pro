@@ -16,11 +16,12 @@ const favoriteRoutes = require("./routes/favoriteRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
-
+const paymentRoutes = require("./routes/paymentRoutes");
+const bannerRoutes = require("./routes/bannerRoutes");
+const canteenRoutes = require("./routes/canteenRoutes");
 
 const app = express();
 const server = http.createServer(app);
-const paymentRoutes = require("./routes/paymentRoutes");
 
 const io = new Server(server, {
   cors: {
@@ -47,6 +48,8 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/payments", paymentRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/banners", bannerRoutes);
+app.use("/api/canteen", canteenRoutes);
 
 // Real-Time Socket.io Seat Locking
 io.on("connection", (socket) => {
@@ -63,15 +66,15 @@ io.on("connection", (socket) => {
       const show = await Show.findById(showId);
       if (!show) return;
       const now = new Date();
-      const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5-min TTL lock
+      const expiresAt = new Date(now.getTime() + 5 * 60 * 1000);
 
-      // Remove expired locks & previous locks by this same user
       let activeLocks = (show.lockedSeats || []).filter(
         (l) => new Date(l.expiresAt) > now && l.userId !== userId
       );
 
       for (const seatId of seats || []) {
-        const takenByOther = activeLocks.some((l) => l.seatId === seatId) || show.bookedSeats.includes(seatId);
+        const takenByOther =
+          activeLocks.some((l) => l.seatId === seatId) || show.bookedSeats.includes(seatId);
         if (!takenByOther) {
           activeLocks.push({ seatId, userId, expiresAt });
         }
@@ -91,7 +94,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// Global error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ message: "Internal server error" });

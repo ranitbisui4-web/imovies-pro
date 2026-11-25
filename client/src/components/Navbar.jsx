@@ -11,6 +11,8 @@ import {
   LogOut,
   LogIn,
   Bell,
+  Popcorn,
+  UserCog,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useAIControl } from "../context/AIControlContext";
@@ -22,6 +24,8 @@ const getScreenLabel = (pathname) => {
   if (pathname.startsWith("/shows/")) return "Showtimes";
   if (pathname.startsWith("/seats/")) return "Seat Selection";
   if (pathname === "/bookings") return "My Bookings";
+  if (pathname === "/canteen") return "Cinema Canteen";
+  if (pathname === "/profile") return "Profile & Settings";
   if (pathname === "/favorites") return "Watchlist";
   if (pathname === "/admin") return "Admin Panel";
   if (pathname === "/login") return "Sign In";
@@ -209,18 +213,35 @@ const Navbar = () => {
               </div>
 
               <Link
+                to="/canteen"
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-amber-300 hover:bg-slate-800 hover:text-amber-200"
+              >
+                <Popcorn className="h-4 w-4 text-amber-400" />
+                <span className="hidden md:inline">Canteen</span>
+              </Link>
+
+              <Link
                 to="/favorites"
                 className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
               >
                 <Heart className="h-4 w-4 text-pink-400" />
                 <span className="hidden md:inline">Favorites</span>
               </Link>
+
               <Link
                 to="/bookings"
                 className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
               >
                 <Ticket className="h-4 w-4 text-emerald-400" />
                 <span className="hidden md:inline">Bookings</span>
+              </Link>
+
+              <Link
+                to="/profile"
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-slate-300 hover:bg-slate-800 hover:text-white"
+              >
+                <UserCog className="h-4 w-4 text-sky-400" />
+                <span className="hidden md:inline">Profile</span>
               </Link>
             </>
           )}

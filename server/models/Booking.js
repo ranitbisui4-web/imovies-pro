@@ -16,9 +16,17 @@ const bookingSchema = new mongoose.Schema(
     discount: { type: Number, default: 0 },
     totalPrice: { type: Number, required: true },
     promoCode: { type: String, default: "" },
-    paymentMethod: { type: String, enum: ["UPI", "CARD", "WALLET"], default: "UPI" },
+    paymentMethod: {
+      type: String,
+      enum: ["UPI", "CARD", "WALLET", "RAZORPAY"],
+      default: "RAZORPAY",
+    },
     paymentStatus: { type: String, enum: ["PAID", "REFUNDED", "FAILED"], default: "PAID" },
     status: { type: String, enum: ["CONFIRMED", "CANCELLED"], default: "CONFIRMED" },
+    refundRate: { type: Number, default: 0 }, // 75 initially, upgraded to 90 if seat rebooked
+    refundAmount: { type: Number, default: 0 },
+    refundUpgradedTo90: { type: Boolean, default: false },
+    cancelledAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

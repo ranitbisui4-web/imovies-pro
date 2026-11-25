@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const https = require("https");
 const Show = require("../models/Show");
 const Booking = require("../models/Booking");
+const { upgradeRefundIfRebooked } = require("./bookingController");
 
 const CONVENIENCE_FEE_PER_SEAT = 25;
 const GST_RATE = 0.18;
@@ -280,6 +281,8 @@ const verifyPayment = async (req, res) => {
     });
 
     const io = req.app.get("io");
+    await upgradeRefundIfRebooked(updatedShow, seats, io);
+
     if (io) {
       io.to(`show:${show._id}`).emit("seats_updated", {
         showId: String(show._id),

@@ -21,6 +21,13 @@ const showSchema = new mongoose.Schema(
     delayReason: { type: String, default: "" },
     bookedSeats: [{ type: String }],
     lockedSeats: [lockedSeatSchema],
+    releasedSeats: [
+      {
+        seatId: { type: String, required: true },
+        previousBookingId: { type: mongoose.Schema.Types.ObjectId, ref: "Booking" },
+        releasedAt: { type: Date, default: Date.now },
+      },
+    ],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true }
