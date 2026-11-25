@@ -32,9 +32,13 @@ exports.register = async (req, res) => {
     }
 
     const requestedRole = role === "admin" ? "admin" : "user";
-    const isApproved = requestedRole === "user";
+    if (requestedRole === "admin" && !String(theatreRequestName || "").trim()) {
+      return res.status(400).json({ message: "Theatre name is required when applying as Admin." });
+    }
 
+    const isApproved = requestedRole === "user";
     const hashedPassword = await bcrypt.hash(password, 10);
+
     const user = await User.create({
       username,
       email: email.toLowerCase(),
@@ -42,7 +46,7 @@ exports.register = async (req, res) => {
       phone: phone || "",
       role: requestedRole,
       isApproved,
-      theatreRequestName: requestedRole === "admin" ? theatreRequestName || "" : "",
+      theatreRequestName: requestedRole === "admin" ? theatreRequestName.trim() : "",
     });
 
     if (requestedRole === "admin") {
@@ -50,10 +54,8 @@ exports.register = async (req, res) => {
         recipientRole: "manager",
         recipientUser: null,
         type: "pending_admin",
-        title: "Admin Approval Due",
-        message: `${username} (${email.toLowerCase()}) requested Admin access${
-          theatreRequestName ? ` for ${theatreRequestName}` : ""
-        }.`,
+        title: "New Admin Request",
+        message: `${username} (${email.toLowerCase()}) applied for Admin (${theatreRequestName.trim()}).`,
       });
     }
 
@@ -107,12 +109,13 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+// ONLY unapproved admin applicants appear in Pending Admin Requests
 exports.getAdminRequests = async (req, res) => {
   try {
-    const admins = await User.find({ role: "admin" })
+    const pendingAdmins = await User.find({ role: "admin", isApproved: false })
       .select("-password")
-      .sort({ isApproved: 1, createdAt: -1 });
-    res.json(admins);
+      .sort({ createdAt: -1 });
+    res.json(pendingAdmins);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -122,7 +125,7 @@ exports.approveAdmin = async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { isApproved: true },
+      { role: "admin", isApproved: true },
       { new: true }
     ).select("-password");
     if (!user) return res.status(404).json({ message: "Admin applicant not found" });
@@ -137,7 +140,7 @@ exports.approveAdmin = async (req, res) => {
       } has been approved by the Manager.`,
     });
 
-    res.json({ message: `${user.username} approved as Admin`, user: formatUser(user) });
+    res.json({ message: `${user.username} approved and moved to Active Admins.`, user: formatUser(user) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -147,7 +150,7 @@ exports.rejectAdmin = async (req, res) => {
   try {
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { role: "user", isApproved: true },
+      { role: "user", isApproved: true, theatreRequestName: "" },
       { new: true }
     ).select("-password");
     if (!user) return res.status(404).json({ message: "User not found" });
@@ -156,11 +159,11 @@ exports.rejectAdmin = async (req, res) => {
       recipientRole: "admin",
       recipientUser: user._id,
       type: "admin_removed",
-      title: "Admin Request Rejected",
-      message: "Your Admin request was declined by the Manager. Your account is set to Customer.",
+      title: "Admin Request Declined",
+      message: "Your Admin request was declined by the Manager.",
     });
 
-    res.json({ message: `Admin request rejected; converted to Customer`, user: formatUser(user) });
+    res.json({ message: `Request rejected and cleared.`, user: formatUser(user) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
