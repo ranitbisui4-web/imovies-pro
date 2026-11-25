@@ -1,28 +1,58 @@
 const Theatre = require("../models/Theatre");
 
-exports.getTheatres = async (req, res) => {
+const getTheatres = async (req, res) => {
   try {
-    const theatres = await Theatre.find().sort({ createdAt: -1 });
+    const { city } = req.query;
+    const filter =
+      city && city !== "All" ? { city: { $regex: `^${String(city).trim()}$`, $options: "i" } } : {};
+    const theatres = await Theatre.find(filter).sort({ createdAt: -1 });
     res.json(theatres);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
 
-exports.addTheatre = async (req, res) => {
+const addTheatre = async (req, res) => {
   try {
-    const theatre = await Theatre.create(req.body);
+    const payload = {
+      ...req.body,
+      createdBy: req.user?._id || null,
+    };
+    if (!String(payload.city || "").trim()) {
+      return res.status(400).json({ message: "Please select a city from the Manager city list." });
+    }
+    const theatre = await Theatre.create(payload);
     res.status(201).json(theatre);
   } catch (err) {
     res.status(400).json({ message: err.message });
   }
 };
 
-exports.deleteTheatre = async (req, res) => {
+const updateTheatre = async (req, res) => {
+  try {
+    const theatre = await Theatre.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+    if (!theatre) return res.status(404).json({ message: "Theatre not found" });
+    res.json(theatre);
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
+};
+
+const deleteTheatre = async (req, res) => {
   try {
     await Theatre.findByIdAndDelete(req.params.id);
     res.json({ message: "Theatre deleted" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+};
+
+module.exports = {
+  getTheatres,
+  addTheatre,
+  updateTheatre,
+  deleteTheatre,
 };
