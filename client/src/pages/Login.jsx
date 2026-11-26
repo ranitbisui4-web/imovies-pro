@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
-import { Film, KeyRound, MailSearch, ShieldCheck, Sparkles } from "lucide-react";
+import { Film, KeyRound, MailSearch, Sparkles } from "lucide-react";
 import api from "../services/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -11,9 +11,6 @@ const Login = () => {
   const [error, setError] = useState("");
   const [infoMsg, setInfoMsg] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const [requestAdmin, setRequestAdmin] = useState(false);
-  const [theatreRequestName, setTheatreRequestName] = useState("");
 
   const [recoveryMode, setRecoveryMode] = useState(null); // "password" | "email" | null
   const [recEmail, setRecEmail] = useState("");
@@ -32,11 +29,7 @@ const Login = () => {
     setInfoMsg("");
     setLoading(true);
     try {
-      const user = await googleLogin({
-        credential: credentialResponse.credential,
-        requestAdmin,
-        theatreRequestName,
-      });
+      const user = await googleLogin({ credential: credentialResponse.credential });
       navigate(
         user.role === "manager" || (user.role === "admin" && user.isApproved) ? "/admin" : "/"
       );
@@ -85,7 +78,7 @@ const Login = () => {
     setInfoMsg("");
     try {
       const { data } = await api.post("/auth/recover-email", { query: recKey });
-      setInfoMsg(`Account found for ${data.username} (${data.role}): ${data.email}`);
+      setInfoMsg(`Account found for ${data.username}: ${data.email}`);
       setEmail(data.email);
       setRecoveryMode(null);
     } catch (err) {
@@ -102,7 +95,7 @@ const Login = () => {
           </div>
           <h1 className="text-2xl font-black text-white">Welcome Back</h1>
           <p className="mt-1 text-xs text-slate-400">
-            Sign in instantly with Google or use your iMovies Pro credentials
+            Sign in to iMovies Pro for tickets, canteen & AI concierge
           </p>
         </div>
 
@@ -119,56 +112,27 @@ const Login = () => {
 
         {!recoveryMode ? (
           <>
-            {/* Passwordless Google Sign-In Section */}
-            <div className="mb-5 rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
-              <div className="mb-3 rounded-xl border border-slate-800/80 bg-slate-900/70 p-2.5 text-xs">
-                <label className="flex cursor-pointer items-center justify-between gap-2 text-slate-200">
-                  <span className="flex items-center gap-1.5 font-semibold">
-                    <ShieldCheck className="h-3.5 w-3.5 text-amber-400" />
-                    New Theatre Admin? Request Access
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={requestAdmin}
-                    onChange={(e) => setRequestAdmin(e.target.checked)}
-                    className="h-4 w-4 accent-red-600"
-                  />
-                </label>
+            <div className="mb-5 flex flex-col items-center justify-center rounded-2xl border border-slate-800 bg-slate-950/70 p-4">
+              {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => setError("Google sign-in popup was closed or failed.")}
+                  theme="filled_black"
+                  shape="pill"
+                  size="large"
+                  text="continue_with"
+                />
+              ) : (
+                <p className="text-center text-[11px] text-amber-300">
+                  Google Sign-In is unavailable. Use email login below.
+                </p>
+              )}
 
-                {requestAdmin && (
-                  <input
-                    type="text"
-                    value={theatreRequestName}
-                    onChange={(e) => setTheatreRequestName(e.target.value)}
-                    placeholder="Enter cinema / theatre name"
-                    className="mt-2.5 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs text-white outline-none focus:border-red-500"
-                  />
-                )}
-              </div>
-
-              <div className="flex flex-col items-center justify-center">
-                {import.meta.env.VITE_GOOGLE_CLIENT_ID ? (
-                  <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={() => setError("Google sign-in popup was closed or failed.")}
-                    theme="filled_black"
-                    shape="pill"
-                    size="large"
-                    text="continue_with"
-                  />
-                ) : (
-                  <p className="text-center text-[11px] text-amber-300">
-                    Set <code className="text-white">VITE_GOOGLE_CLIENT_ID</code> in{" "}
-                    <code className="text-white">client/.env</code> & Vercel to enable Google Login.
-                  </p>
-                )}
-
-                {loading && (
-                  <p className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
-                    <Sparkles className="h-3.5 w-3.5" /> Authenticating...
-                  </p>
-                )}
-              </div>
+              {loading && (
+                <p className="mt-2.5 flex items-center gap-1 text-[11px] font-semibold text-emerald-400">
+                  <Sparkles className="h-3.5 w-3.5" /> Authenticating...
+                </p>
+              )}
             </div>
 
             <div className="relative my-5 flex items-center justify-center">

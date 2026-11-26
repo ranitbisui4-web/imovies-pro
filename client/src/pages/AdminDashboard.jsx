@@ -8,6 +8,7 @@ import {
   Film,
   Image,
   Lock,
+  MailPlus,
   MapPin,
   Pencil,
   Plus,
@@ -68,6 +69,12 @@ const AdminDashboard = () => {
   const [cities, setCities] = useState([]);
   const [statusMsg, setStatusMsg] = useState("");
   const [loading, setLoading] = useState(true);
+
+  // Assign Staff Role by Gmail state
+  const [staffEmail, setStaffEmail] = useState("");
+  const [staffRole, setStaffRole] = useState("admin");
+  const [staffTheatre, setStaffTheatre] = useState("");
+  const [assigningRole, setAssigningRole] = useState(false);
 
   const [bookingSearch, setBookingSearch] = useState("");
   const [bookingStatusFilter, setBookingStatusFilter] = useState("ALL");
@@ -161,6 +168,27 @@ const AdminDashboard = () => {
   const notify = (msg) => {
     setStatusMsg(msg);
     setTimeout(() => setStatusMsg(""), 4500);
+  };
+
+  const handleAssignRoleByGmail = async (e) => {
+    e.preventDefault();
+    if (!staffEmail.trim()) return;
+    setAssigningRole(true);
+    try {
+      const { data } = await api.post("/auth/assign-role", {
+        email: staffEmail.trim(),
+        role: staffRole,
+        theatreName: staffRole === "admin" ? staffTheatre.trim() : "",
+      });
+      notify(data.message);
+      setStaffEmail("");
+      setStaffTheatre("");
+      loadAll();
+    } catch (err) {
+      notify(err.response?.data?.message || "Failed to assign role by Gmail.");
+    } finally {
+      setAssigningRole(false);
+    }
   };
 
   const handleSaveMovie = async (e) => {
@@ -475,6 +503,63 @@ const AdminDashboard = () => {
         <>
           {tab === "approvals" && isManager && (
             <div className="space-y-8">
+              {/* Assign Staff Role by Gmail Card */}
+              <div className="rounded-3xl border border-amber-500/30 bg-[#111827] p-6">
+                <h2 className="mb-1 flex items-center gap-2 text-base font-bold text-amber-300">
+                  <MailPlus className="h-4 w-4 text-amber-400" />
+                  Assign Staff Role by Gmail
+                </h2>
+                <p className="mb-4 text-xs text-slate-400">
+                  Enter a user&apos;s Gmail address and select their role. When they sign in with
+                  Google, they will automatically enter with their assigned role.
+                </p>
+
+                <form
+                  onSubmit={handleAssignRoleByGmail}
+                  className="grid grid-cols-1 gap-3 sm:grid-cols-4"
+                >
+                  <input
+                    type="email"
+                    required
+                    value={staffEmail}
+                    onChange={(e) => setStaffEmail(e.target.value)}
+                    placeholder="user@gmail.com"
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-400"
+                  />
+
+                  <select
+                    value={staffRole}
+                    onChange={(e) => setStaffRole(e.target.value)}
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs font-semibold text-white outline-none focus:border-amber-400"
+                  >
+                    <option value="admin">Theatre Admin</option>
+                    <option value="manager">Head Manager</option>
+                    <option value="user">Customer (Revoke Staff)</option>
+                  </select>
+
+                  <input
+                    type="text"
+                    value={staffTheatre}
+                    onChange={(e) => setStaffTheatre(e.target.value)}
+                    disabled={staffRole !== "admin"}
+                    placeholder={
+                      staffRole === "admin"
+                        ? "Assigned Theatre Name"
+                        : "Only needed for Theatre Admin"
+                    }
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-400 disabled:opacity-40"
+                  />
+
+                  <button
+                    type="submit"
+                    disabled={assigningRole}
+                    className="rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-black text-slate-950 hover:bg-amber-400 disabled:opacity-50"
+                  >
+                    {assigningRole ? "Assigning..." : "Assign Role"}
+                  </button>
+                </form>
+              </div>
+
               <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
                 <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-white">
                   <Crown className="h-4 w-4 text-amber-400" />

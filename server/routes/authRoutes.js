@@ -6,6 +6,7 @@ const {
   register,
   login,
   googleLogin,
+  assignRoleByEmail,
   getProfile,
   updateProfile,
   getAdminRequests,
@@ -100,6 +101,7 @@ router.post("/recover-email", async (req, res) => {
 });
 
 // Super Manager routes
+router.post("/assign-role", protect, managerOnly, assignRoleByEmail);
 router.get("/admin-requests", protect, managerOnly, getAdminRequests);
 router.patch("/admin-requests/:id/approve", protect, managerOnly, approveAdmin);
 router.patch("/admin-requests/:id/reject", protect, managerOnly, rejectAdmin);

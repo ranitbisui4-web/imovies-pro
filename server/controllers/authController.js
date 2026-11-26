@@ -21,12 +21,13 @@ const formatUser = (user) => ({
   phone: user.phone,
   role: user.role,
   isApproved: user.isApproved,
-  theatreRequestName: user.theatreRequestName,
+  theatreName: user.theatreName || user.theatreRequestName || "",
+  theatreRequestName: user.theatreRequestName || "",
 });
 
 exports.register = async (req, res) => {
   try {
-    const { username, email, password, phone, role, theatreRequestName } = req.body;
+    const { username, email, password, phone } = req.body;
     if (!username || !email || !password) {
       return res.status(400).json({ message: "Username, email, and password are required" });
     }
@@ -35,12 +36,6 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: "Email is already registered" });
     }
 
-    const requestedRole = role === "admin" ? "admin" : "user";
-    if (requestedRole === "admin" && !String(theatreRequestName || "").trim()) {
-      return res.status(400).json({ message: "Theatre name is required when applying as Admin." });
-    }
-
-    const isApproved = requestedRole === "user";
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await User.create({
@@ -48,26 +43,14 @@ exports.register = async (req, res) => {
       email: email.toLowerCase(),
       password: hashedPassword,
       phone: phone || "",
-      role: requestedRole,
-      isApproved,
-      theatreRequestName: requestedRole === "admin" ? theatreRequestName.trim() : "",
+      role: "user",
+      isApproved: true,
     });
-
-    if (requestedRole === "admin") {
-      await Notification.create({
-        recipientRole: "manager",
-        recipientUser: null,
-        type: "pending_admin",
-        title: "New Admin Request",
-        message: `${username} (${email.toLowerCase()}) applied for Admin (${theatreRequestName.trim()}).`,
-      });
-    }
 
     const token = signToken(user);
     res.status(201).json({
       token,
       user: formatUser(user),
-      pendingApproval: !isApproved,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -97,7 +80,7 @@ exports.login = async (req, res) => {
 
 exports.googleLogin = async (req, res) => {
   try {
-    const { credential, requestAdmin, theatreRequestName } = req.body;
+    const { credential } = req.body;
     if (!credential) {
       return res.status(400).json({ message: "Google credential token is required" });
     }
@@ -120,14 +103,7 @@ exports.googleLogin = async (req, res) => {
     let user = await User.findOne({ $or: [{ googleId }, { email: cleanEmail }] });
 
     if (!user) {
-      const wantsAdmin = Boolean(requestAdmin);
-      const cleanTheatre = String(theatreRequestName || "").trim();
-      if (wantsAdmin && !cleanTheatre) {
-        return res.status(400).json({ message: "Theatre name is required when applying as Admin." });
-      }
-
       const randomHash = await bcrypt.hash(crypto.randomBytes(24).toString("hex"), 10);
-      const isApproved = !wantsAdmin;
 
       user = await User.create({
         username: displayName,
@@ -136,34 +112,98 @@ exports.googleLogin = async (req, res) => {
         googleId,
         authProvider: "google",
         phone: "",
-        role: wantsAdmin ? "admin" : "user",
-        isApproved,
-        theatreRequestName: wantsAdmin ? cleanTheatre : "",
+        role: "user",
+        isApproved: true,
       });
-
-      if (wantsAdmin) {
-        await Notification.create({
-          recipientRole: "manager",
-          recipientUser: null,
-          type: "pending_admin",
-          title: "New Admin Request",
-          message: `${displayName} (${cleanEmail}) applied for Admin (${cleanTheatre}).`,
-        });
+    } else {
+      let updated = false;
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.authProvider = "google";
+        updated = true;
       }
-    } else if (!user.googleId) {
-      user.googleId = googleId;
-      user.authProvider = "google";
-      await user.save();
+      if (user.username === cleanEmail.split("@")[0] && displayName) {
+        user.username = displayName;
+        updated = true;
+      }
+      if (updated) await user.save();
     }
 
     const token = signToken(user);
     res.json({
       token,
       user: formatUser(user),
-      pendingApproval: !user.isApproved,
     });
   } catch (err) {
     res.status(401).json({ message: err.message || "Google sign-in failed" });
+  }
+};
+
+// Head Manager assigns a role ("admin", "manager", or "user") to any Gmail address
+exports.assignRoleByEmail = async (req, res) => {
+  try {
+    const { email, role, theatreName = "" } = req.body;
+    const cleanEmail = String(email || "").trim().toLowerCase();
+    const validRoles = ["user", "admin", "manager"];
+
+    if (!cleanEmail || !cleanEmail.includes("@")) {
+      return res.status(400).json({ message: "Please enter a valid Gmail / email address." });
+    }
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: "Role must be user, admin, or manager." });
+    }
+    if (req.user.email === cleanEmail && role !== "manager") {
+      return res.status(400).json({ message: "You cannot downgrade your own Head Manager account." });
+    }
+
+    const cleanTheatre = String(theatreName || "").trim();
+    let user = await User.findOne({ email: cleanEmail });
+
+    if (user) {
+      user.role = role;
+      user.isApproved = true;
+      if (role === "admin") {
+        user.theatreName = cleanTheatre || user.theatreName || "Partner Cinema";
+        user.theatreRequestName = user.theatreName;
+      } else {
+        user.theatreName = "";
+        user.theatreRequestName = "";
+      }
+      await user.save();
+    } else {
+      const randomHash = await bcrypt.hash(crypto.randomBytes(24).toString("hex"), 10);
+      user = await User.create({
+        username: cleanEmail.split("@")[0],
+        email: cleanEmail,
+        password: randomHash,
+        authProvider: "google",
+        role,
+        isApproved: true,
+        theatreName: role === "admin" ? cleanTheatre || "Partner Cinema" : "",
+        theatreRequestName: role === "admin" ? cleanTheatre || "Partner Cinema" : "",
+      });
+    }
+
+    if (role === "admin" || role === "manager") {
+      await Notification.create({
+        recipientRole: role,
+        recipientUser: user._id,
+        type: "admin_approved",
+        title: `Assigned as ${role === "manager" ? "Head Manager" : "Theatre Admin"}`,
+        message: `You have been granted ${role.toUpperCase()} access${
+          user.theatreName ? ` for ${user.theatreName}` : ""
+        }.`,
+      });
+    }
+
+    res.json({
+      message: `${cleanEmail} is now set as ${role.toUpperCase()}${
+        user.theatreName ? ` (${user.theatreName})` : ""
+      }.`,
+      user: formatUser(user),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 };
 
