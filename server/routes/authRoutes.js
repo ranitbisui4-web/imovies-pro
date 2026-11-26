@@ -5,6 +5,7 @@ const User = require("../models/User");
 const {
   register,
   login,
+  googleLogin,
   getProfile,
   updateProfile,
   getAdminRequests,
@@ -15,6 +16,7 @@ const { protect, managerOnly } = require("../middlewares/authMiddleware");
 
 router.post("/register", register);
 router.post("/login", login);
+router.post("/google", googleLogin);
 router.get("/profile", protect, getProfile);
 router.put("/profile", protect, updateProfile);
 

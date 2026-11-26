@@ -10,6 +10,32 @@ export const AuthProvider = ({ children }) => {
   });
   const [loading, setLoading] = useState(false);
 
+  const persistSession = (token, nextUser) => {
+    if (token) {
+      localStorage.setItem("imovies_token", token);
+    }
+    if (nextUser) {
+      localStorage.setItem("imovies_user", JSON.stringify(nextUser));
+    }
+    setUser(nextUser || null);
+  };
+
+  const refreshProfile = async () => {
+    const token = localStorage.getItem("imovies_token");
+    if (!token) return null;
+    try {
+      const { data } = await api.get("/auth/profile");
+      if (data?.user) {
+        localStorage.setItem("imovies_user", JSON.stringify(data.user));
+        setUser(data.user);
+        return data.user;
+      }
+    } catch {
+      // ignore transient error
+    }
+    return null;
+  };
+
   useEffect(() => {
     const token = localStorage.getItem("imovies_token");
     if (token && !user) {
@@ -30,9 +56,19 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/login", { email, password });
-      localStorage.setItem("imovies_token", data.token);
-      localStorage.setItem("imovies_user", JSON.stringify(data.user));
-      setUser(data.user);
+      persistSession(data.token, data.user);
+      return data.user;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const googleLogin = async (payload) => {
+    setLoading(true);
+    try {
+      const body = typeof payload === "string" ? { credential: payload } : payload;
+      const { data } = await api.post("/auth/google", body);
+      persistSession(data.token, data.user);
       return data.user;
     } finally {
       setLoading(false);
@@ -43,9 +79,7 @@ export const AuthProvider = ({ children }) => {
     setLoading(true);
     try {
       const { data } = await api.post("/auth/register", payload);
-      localStorage.setItem("imovies_token", data.token);
-      localStorage.setItem("imovies_user", JSON.stringify(data.user));
-      setUser(data.user);
+      persistSession(data.token, data.user);
       return data.user;
     } finally {
       setLoading(false);
@@ -59,7 +93,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, login, googleLogin, register, logout, refreshProfile }}
+    >
       {children}
     </AuthContext.Provider>
   );

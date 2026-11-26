@@ -1,7 +1,11 @@
+const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { OAuth2Client } = require("google-auth-library");
 const User = require("../models/User");
 const Notification = require("../models/Notification");
+
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 const signToken = (user) =>
   jwt.sign(
@@ -88,6 +92,78 @@ exports.login = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+exports.googleLogin = async (req, res) => {
+  try {
+    const { credential, requestAdmin, theatreRequestName } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: "Google credential token is required" });
+    }
+
+    const audience = process.env.GOOGLE_CLIENT_ID;
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      ...(audience ? { audience } : {}),
+    });
+    const payload = ticket.getPayload();
+
+    if (!payload?.email || payload.email_verified === false) {
+      return res.status(401).json({ message: "Google email is not verified" });
+    }
+
+    const cleanEmail = String(payload.email).trim().toLowerCase();
+    const googleId = String(payload.sub || "");
+    const displayName = String(payload.name || cleanEmail.split("@")[0] || "Cinema User").trim();
+
+    let user = await User.findOne({ $or: [{ googleId }, { email: cleanEmail }] });
+
+    if (!user) {
+      const wantsAdmin = Boolean(requestAdmin);
+      const cleanTheatre = String(theatreRequestName || "").trim();
+      if (wantsAdmin && !cleanTheatre) {
+        return res.status(400).json({ message: "Theatre name is required when applying as Admin." });
+      }
+
+      const randomHash = await bcrypt.hash(crypto.randomBytes(24).toString("hex"), 10);
+      const isApproved = !wantsAdmin;
+
+      user = await User.create({
+        username: displayName,
+        email: cleanEmail,
+        password: randomHash,
+        googleId,
+        authProvider: "google",
+        phone: "",
+        role: wantsAdmin ? "admin" : "user",
+        isApproved,
+        theatreRequestName: wantsAdmin ? cleanTheatre : "",
+      });
+
+      if (wantsAdmin) {
+        await Notification.create({
+          recipientRole: "manager",
+          recipientUser: null,
+          type: "pending_admin",
+          title: "New Admin Request",
+          message: `${displayName} (${cleanEmail}) applied for Admin (${cleanTheatre}).`,
+        });
+      }
+    } else if (!user.googleId) {
+      user.googleId = googleId;
+      user.authProvider = "google";
+      await user.save();
+    }
+
+    const token = signToken(user);
+    res.json({
+      token,
+      user: formatUser(user),
+      pendingApproval: !user.isApproved,
+    });
+  } catch (err) {
+    res.status(401).json({ message: err.message || "Google sign-in failed" });
   }
 };
 
