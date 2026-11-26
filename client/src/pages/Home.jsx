@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Clock,
   Coffee,
+  MapPin,
   Play,
   Radio,
   Search,
@@ -16,6 +17,7 @@ import MovieCard from "../components/MovieCard";
 import { useAIControl } from "../context/AIControlContext";
 
 const GENRES = ["All", "Action", "Thriller", "Drama", "Sci-Fi", "Comedy", "Horror", "Fantasy"];
+const TABS = ["Now Showing", "Top Rated", "Coming Soon"];
 
 const readCache = (key, fallback) => {
   try {
@@ -31,9 +33,23 @@ const Home = () => {
   const [movies, setMovies] = useState(() => readCache("imovies_movies_cache", []));
   const [banners, setBanners] = useState(() => readCache("imovies_banners_cache", []));
   const [shows, setShows] = useState(() => readCache("imovies_shows_cache", []));
+  const [cities, setCities] = useState([]);
+  const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem("imovies_city") || "All");
+  const [activeTab, setActiveTab] = useState("Now Showing");
   const [loading, setLoading] = useState(() => readCache("imovies_movies_cache", []).length === 0);
   const [slideIdx, setSlideIdx] = useState(0);
   const { movieFilters, setMovieFilters, setIsOpen } = useAIControl();
+
+  useEffect(() => {
+    localStorage.setItem("imovies_city", selectedCity);
+  }, [selectedCity]);
+
+  useEffect(() => {
+    api
+      .get("/manager/cities")
+      .then((res) => setCities(Array.isArray(res.data) ? res.data : []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -72,6 +88,32 @@ const Home = () => {
     };
   }, [movieFilters]);
 
+  const filteredShows = useMemo(() => {
+    if (selectedCity === "All") return shows;
+    return shows.filter(
+      (s) => String(s.theatre?.city || "").toLowerCase() === selectedCity.toLowerCase()
+    );
+  }, [shows, selectedCity]);
+
+  const displayedMovies = useMemo(() => {
+    let list = [...movies];
+    if (selectedCity !== "All" && filteredShows.length > 0) {
+      const cityMovieIds = new Set(
+        filteredShows.map((s) => String(s.movie?._id || s.movie || "")).filter(Boolean)
+      );
+      if (cityMovieIds.size > 0) {
+        const matching = list.filter((m) => cityMovieIds.has(String(m._id)));
+        if (matching.length > 0) list = matching;
+      }
+    }
+    if (activeTab === "Top Rated") {
+      list.sort((a, b) => (Number(b.rating) || 0) - (Number(a.rating) || 0));
+    } else if (activeTab === "Coming Soon") {
+      list.reverse();
+    }
+    return list;
+  }, [movies, selectedCity, filteredShows, activeTab]);
+
   const slides = useMemo(() => {
     if (banners.length > 0) {
       return banners.map((b) => ({
@@ -106,6 +148,42 @@ const Home = () => {
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
+      {/* Hybrid City & Discovery Strip (BookMyShow + TicketNew UX in Red & Black) */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800/90 bg-[#0f1523] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-red-500" />
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">City:</span>
+          <select
+            value={selectedCity}
+            onChange={(e) => setSelectedCity(e.target.value)}
+            className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-1.5 text-xs font-bold text-white outline-none focus:border-red-500"
+          >
+            <option value="All">All Cities</option>
+            {cities.map((c) => (
+              <option key={c._id} value={c.name}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-wrap gap-1.5">
+          {TABS.map((t) => (
+            <button
+              key={t}
+              onClick={() => setActiveTab(t)}
+              className={`rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+                activeTab === t
+                  ? "bg-red-600 text-white shadow-md shadow-red-600/25"
+                  : "bg-slate-900 text-slate-300 hover:bg-slate-800 hover:text-white"
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Admin-Controlled Clickable Hero Banner Slideshow */}
       {activeSlide && (
         <div
@@ -131,10 +209,7 @@ const Home = () => {
             <p className="mt-2.5 line-clamp-2 text-sm text-slate-300 sm:text-base">
               {activeSlide.subtitle}
             </p>
-            <div
-              className="mt-5 flex flex-wrap gap-3"
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div className="mt-5 flex flex-wrap gap-3" onClick={(e) => e.stopPropagation()}>
               <Link
                 to={`/shows/${activeSlide.movieId}`}
                 className="flex items-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-red-600/30 transition hover:bg-red-700"
@@ -143,7 +218,7 @@ const Home = () => {
               </Link>
               <button
                 onClick={() => setIsOpen(true)}
-                className="flex items-center gap-2 rounded-xl border border-violet-500/40 bg-violet-600/20 px-5 py-2.5 text-sm font-bold text-violet-200 hover:bg-violet-600/30"
+                className="flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-950/50 px-5 py-2.5 text-sm font-bold text-red-200 hover:bg-red-900/50"
               >
                 <Sparkles className="h-4 w-4" /> AI Seat Concierge
               </button>
@@ -224,9 +299,12 @@ const Home = () => {
       {/* Movie Grid */}
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-xl font-extrabold text-white">
-          Now Showing on <span className="text-red-500">iMovies Pro</span>
+          {activeTab} on <span className="text-red-500">iMovies Pro</span>
+          {selectedCity !== "All" && (
+            <span className="ml-2 text-sm font-semibold text-emerald-400">• {selectedCity}</span>
+          )}
         </h2>
-        <span className="text-xs text-slate-400">{movies.length} titles available</span>
+        <span className="text-xs text-slate-400">{displayedMovies.length} titles available</span>
       </div>
 
       {loading ? (
@@ -238,20 +316,20 @@ const Home = () => {
             />
           ))}
         </div>
-      ) : movies.length === 0 ? (
+      ) : displayedMovies.length === 0 ? (
         <div className="rounded-2xl border border-slate-800 bg-[#111827] p-12 text-center text-slate-400">
           No movies found matching your filters.
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {movies.map((m) => (
+          {displayedMovies.map((m) => (
             <MovieCard key={m._id} movie={m} />
           ))}
         </div>
       )}
 
       {/* Live Show Schedule, Break/Interval & Delay Status Board */}
-      {shows.length > 0 && (
+      {filteredShows.length > 0 && (
         <div className="mt-12 rounded-3xl border border-slate-800 bg-[#0e1422] p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
@@ -260,13 +338,13 @@ const Home = () => {
                 Live Screen Timeline, Interval & Delay Board
               </h2>
               <p className="text-xs text-slate-400">
-                Real-time start time, intermission break window, resume time, and estimated end time across all screens.
+                Real-time start time, intermission break window, resume time, and estimated end time across screens.
               </p>
             </div>
           </div>
 
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {shows.slice(0, 9).map((s) => (
+            {filteredShows.slice(0, 9).map((s) => (
               <div
                 key={s._id}
                 className={`rounded-2xl border p-4 text-xs ${

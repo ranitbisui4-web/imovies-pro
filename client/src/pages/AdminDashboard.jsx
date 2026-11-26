@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   Building2,
@@ -11,6 +11,7 @@ import {
   MapPin,
   Pencil,
   Plus,
+  Search,
   ShieldCheck,
   Ticket,
   Trash2,
@@ -67,6 +68,9 @@ const AdminDashboard = () => {
   const [cities, setCities] = useState([]);
   const [statusMsg, setStatusMsg] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const [bookingSearch, setBookingSearch] = useState("");
+  const [bookingStatusFilter, setBookingStatusFilter] = useState("ALL");
 
   const [movieForm, setMovieForm] = useState(EMPTY_MOVIE);
   const [editingMovieId, setEditingMovieId] = useState(null);
@@ -294,6 +298,20 @@ const AdminDashboard = () => {
     loadAll();
   };
 
+  const filteredBookings = useMemo(() => {
+    const q = bookingSearch.trim().toLowerCase();
+    return bookings.filter((b) => {
+      if (bookingStatusFilter !== "ALL" && b.status !== bookingStatusFilter) return false;
+      if (!q) return true;
+      return (
+        String(b.movieTitle || "").toLowerCase().includes(q) ||
+        String(b.bookingId || "").toLowerCase().includes(q) ||
+        String(b.theatreName || "").toLowerCase().includes(q) ||
+        String(b.user?.username || "").toLowerCase().includes(q)
+      );
+    });
+  }, [bookings, bookingSearch, bookingStatusFilter]);
+
   if (!isApprovedAdmin) {
     return (
       <div className="mx-auto max-w-xl px-4 py-16 text-center">
@@ -316,9 +334,14 @@ const AdminDashboard = () => {
     );
   }
 
-  const totalRevenue = bookings
-    .filter((b) => b.status === "CONFIRMED")
-    .reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+  const confirmedBookings = bookings.filter((b) => b.status === "CONFIRMED");
+  const cancelledBookings = bookings.filter((b) => b.status === "CANCELLED");
+  const upgraded90Count = cancelledBookings.filter(
+    (b) => b.refundUpgradedTo90 || b.refundRate === 90
+  ).length;
+  const delayedShowsCount = shows.filter((s) => Number(s.delayMinutes) > 0).length;
+
+  const totalRevenue = confirmedBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
   const activeAdmins = allUsers.filter((u) => u.role === "admin" && u.isApproved);
   const regularCustomers = allUsers.filter((u) => u.role === "user");
@@ -352,6 +375,54 @@ const AdminDashboard = () => {
           <span className="rounded-xl border border-slate-800 bg-slate-900 px-3 py-2 text-slate-300">
             Revenue: <strong className="text-emerald-400">₹{totalRevenue}</strong>
           </span>
+        </div>
+      </div>
+
+      {/* Executive KPI Strip */}
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="rounded-2xl border border-slate-800 bg-[#111827] p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Confirmed Tickets
+          </p>
+          <p className="mt-1 text-2xl font-black text-emerald-400">{confirmedBookings.length}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">
+            Across {shows.length} scheduled show(s)
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-[#111827] p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Gross Ticket Revenue
+          </p>
+          <p className="mt-1 text-2xl font-black text-white">₹{totalRevenue}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">
+            {theatres.length} active cinema(s)
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-[#111827] p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Refunds & 90% Upgrades
+          </p>
+          <p className="mt-1 text-2xl font-black text-amber-400">
+            {cancelledBookings.length}{" "}
+            <span className="text-xs font-bold text-emerald-400">
+              ({upgraded90Count} @ 90%)
+            </span>
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-400">
+            75% base • 90% on seat rebook
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-slate-800 bg-[#111827] p-4">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            Schedule Adjustments
+          </p>
+          <p className="mt-1 text-2xl font-black text-red-400">{delayedShowsCount}</p>
+          <p className="mt-0.5 text-[11px] text-slate-400">
+            Break-buffer auto-recovery active
+          </p>
         </div>
       </div>
 
@@ -845,7 +916,6 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* SHOWS & SMART DELAY AUTO-RECOVERY */}
           {tab === "shows" && (
             <div className="grid gap-8 lg:grid-cols-[360px,1fr]">
               <form
@@ -931,7 +1001,6 @@ const AdminDashboard = () => {
                       </button>
                     </div>
 
-                    {/* Smart Delay & Break Auto-Recovery Controls */}
                     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-slate-800 pt-3">
                       <AlertTriangle className="h-4 w-4 text-amber-400" />
                       <input
@@ -973,7 +1042,6 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* HERO BANNER SLIDESHOW MANAGER */}
           {tab === "banners" && (
             <div className="grid gap-8 lg:grid-cols-[360px,1fr]">
               <form
@@ -1071,27 +1139,63 @@ const AdminDashboard = () => {
           )}
 
           {tab === "bookings" && (
-            <div className="space-y-3">
-              {bookings.map((b) => (
-                <div
-                  key={b._id}
-                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-[#111827] p-4 text-xs"
-                >
-                  <div>
-                    <p className="font-bold text-white">
-                      {b.movieTitle} ({b.bookingId})
-                    </p>
-                    <p className="text-slate-400">
-                      {b.theatreName} • {b.showdate} {b.showtime} • Seats:{" "}
-                      {(b.seats || []).join(", ")}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-emerald-400">₹{b.totalPrice}</p>
-                    <p className="text-[11px] text-slate-400">{b.status}</p>
-                  </div>
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-[#111827] p-4">
+                <div className="relative w-full sm:max-w-sm">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={bookingSearch}
+                    onChange={(e) => setBookingSearch(e.target.value)}
+                    placeholder="Search ID, movie, theatre, or user..."
+                    className="w-full rounded-xl border border-slate-700 bg-slate-900 py-2 pl-9 pr-3 text-xs text-white outline-none focus:border-red-500"
+                  />
                 </div>
-              ))}
+                <div className="flex gap-2">
+                  {["ALL", "CONFIRMED", "CANCELLED"].map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setBookingStatusFilter(st)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-bold ${
+                        bookingStatusFilter === st
+                          ? "bg-red-600 text-white"
+                          : "border border-slate-700 bg-slate-900 text-slate-300"
+                      }`}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {filteredBookings.map((b) => (
+                  <div
+                    key={b._id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-[#111827] p-4 text-xs"
+                  >
+                    <div>
+                      <p className="font-bold text-white">
+                        {b.movieTitle} ({b.bookingId})
+                      </p>
+                      <p className="text-slate-400">
+                        {b.theatreName} • {b.showdate} {b.showtime} • Seats:{" "}
+                        {(b.seats || []).join(", ")}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-emerald-400">₹{b.totalPrice}</p>
+                      <p className="text-[11px] text-slate-400">
+                        {b.status}
+                        {b.status === "CANCELLED"
+                          ? ` • ${b.refundRate || (b.refundUpgradedTo90 ? 90 : 75)}% Refund (₹${
+                              b.refundAmount || 0
+                            })`
+                          : ""}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </>
