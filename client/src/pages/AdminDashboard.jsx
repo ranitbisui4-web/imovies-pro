@@ -70,8 +70,12 @@ const AdminDashboard = () => {
   const [statusMsg, setStatusMsg] = useState("");
   const [loading, setLoading] = useState(true);
 
-  // Assign Staff Role by Gmail state
+  // Staff profile + Gmail Role Assignment state
+  const [staffName, setStaffName] = useState("");
   const [staffEmail, setStaffEmail] = useState("");
+  const [staffPhone, setStaffPhone] = useState("");
+  const [staffPhoto, setStaffPhoto] = useState("");
+  const [staffGovtId, setStaffGovtId] = useState("");
   const [staffRole, setStaffRole] = useState("admin");
   const [staffTheatre, setStaffTheatre] = useState("");
   const [assigningRole, setAssigningRole] = useState(false);
@@ -176,12 +180,20 @@ const AdminDashboard = () => {
     setAssigningRole(true);
     try {
       const { data } = await api.post("/auth/assign-role", {
+        username: staffName.trim(),
         email: staffEmail.trim(),
+        phone: staffPhone.trim(),
+        photoUrl: staffPhoto.trim(),
+        govtId: staffGovtId.trim(),
         role: staffRole,
         theatreName: staffRole === "admin" ? staffTheatre.trim() : "",
       });
       notify(data.message);
+      setStaffName("");
       setStaffEmail("");
+      setStaffPhone("");
+      setStaffPhoto("");
+      setStaffGovtId("");
       setStaffTheatre("");
       loadAll();
     } catch (err) {
@@ -371,6 +383,7 @@ const AdminDashboard = () => {
 
   const totalRevenue = confirmedBookings.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
 
+  const activeManagers = allUsers.filter((u) => u.role === "manager");
   const activeAdmins = allUsers.filter((u) => u.role === "admin" && u.isApproved);
   const regularCustomers = allUsers.filter((u) => u.role === "user");
 
@@ -503,27 +516,61 @@ const AdminDashboard = () => {
         <>
           {tab === "approvals" && isManager && (
             <div className="space-y-8">
-              {/* Assign Staff Role by Gmail Card */}
+              {/* Add Manager / Theatre Admin by Gmail + Staff Profile Card */}
               <div className="rounded-3xl border border-amber-500/30 bg-[#111827] p-6">
                 <h2 className="mb-1 flex items-center gap-2 text-base font-bold text-amber-300">
                   <MailPlus className="h-4 w-4 text-amber-400" />
-                  Assign Staff Role by Gmail
+                  Add Head Manager / Theatre Admin by Gmail
                 </h2>
                 <p className="mb-4 text-xs text-slate-400">
-                  Enter a user&apos;s Gmail address and select their role. When they sign in with
-                  Google, they will automatically enter with their assigned role.
+                  Enter staff details and Gmail address. When they sign in with Google, they
+                  automatically enter with their assigned role.
                 </p>
 
                 <form
                   onSubmit={handleAssignRoleByGmail}
-                  className="grid grid-cols-1 gap-3 sm:grid-cols-4"
+                  className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
                 >
+                  <input
+                    type="text"
+                    required
+                    value={staffName}
+                    onChange={(e) => setStaffName(e.target.value)}
+                    placeholder="Full Name *"
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-400"
+                  />
+
                   <input
                     type="email"
                     required
                     value={staffEmail}
                     onChange={(e) => setStaffEmail(e.target.value)}
-                    placeholder="user@gmail.com"
+                    placeholder="Gmail Address (user@gmail.com) *"
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-400"
+                  />
+
+                  <input
+                    type="tel"
+                    required
+                    value={staffPhone}
+                    onChange={(e) => setStaffPhone(e.target.value)}
+                    placeholder="Mobile Number *"
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-400"
+                  />
+
+                  <input
+                    type="url"
+                    value={staffPhoto}
+                    onChange={(e) => setStaffPhoto(e.target.value)}
+                    placeholder="Profile Photo URL (optional)"
+                    className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-400"
+                  />
+
+                  <input
+                    type="text"
+                    value={staffGovtId}
+                    onChange={(e) => setStaffGovtId(e.target.value)}
+                    placeholder="Govt ID Number (Aadhaar / PAN - optional)"
                     className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-400"
                   />
 
@@ -534,41 +581,136 @@ const AdminDashboard = () => {
                   >
                     <option value="admin">Theatre Admin</option>
                     <option value="manager">Head Manager</option>
-                    <option value="user">Customer (Revoke Staff)</option>
                   </select>
 
-                  <input
-                    type="text"
-                    value={staffTheatre}
-                    onChange={(e) => setStaffTheatre(e.target.value)}
-                    disabled={staffRole !== "admin"}
-                    placeholder={
-                      staffRole === "admin"
-                        ? "Assigned Theatre Name"
-                        : "Only needed for Theatre Admin"
-                    }
-                    className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-400 disabled:opacity-40"
-                  />
+                  {staffRole === "admin" && (
+                    <input
+                      type="text"
+                      value={staffTheatre}
+                      onChange={(e) => setStaffTheatre(e.target.value)}
+                      placeholder="Assigned Theatre Name"
+                      className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-400 sm:col-span-2"
+                    />
+                  )}
 
                   <button
                     type="submit"
                     disabled={assigningRole}
                     className="rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-black text-slate-950 hover:bg-amber-400 disabled:opacity-50"
                   >
-                    {assigningRole ? "Assigning..." : "Assign Role"}
+                    {assigningRole ? "Saving Staff..." : "Save & Assign Role"}
                   </button>
                 </form>
               </div>
 
-              <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
-                <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-white">
-                  <Crown className="h-4 w-4 text-amber-400" />
-                  Pending Admin Requests ({requests.length})
-                </h2>
+              {/* Active Head Managers & Approved Theatre Admins Lists */}
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Head Managers List */}
+                <div className="rounded-3xl border border-amber-500/30 bg-[#111827] p-6">
+                  <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-amber-400">
+                    <Crown className="h-4 w-4" /> Head Managers ({activeManagers.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {activeManagers.map((mgr) => (
+                      <div
+                        key={mgr._id}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={
+                              mgr.photoUrl ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                mgr.username || "Manager"
+                              )}&background=f59e0b&color=0f172a`
+                            }
+                            alt={mgr.username}
+                            className="h-11 w-11 rounded-full border border-amber-400/50 object-cover"
+                          />
+                          <div>
+                            <p className="text-xs font-bold text-white">
+                              {mgr.username}
+                              {mgr._id === user?.id && (
+                                <span className="ml-1.5 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-300">
+                                  You
+                                </span>
+                              )}
+                            </p>
+                            <p className="text-[11px] text-slate-400">{mgr.email}</p>
+                            <p className="text-[11px] text-slate-300">
+                              {mgr.phone ? `Mobile: ${mgr.phone}` : "No mobile"}
+                              {mgr.govtId ? ` • Govt ID: ${mgr.govtId}` : ""}
+                            </p>
+                          </div>
+                        </div>
 
-                {requests.length === 0 ? (
-                  <p className="text-xs text-slate-400">No pending Admin applications right now.</p>
-                ) : (
+                        {mgr._id !== user?.id && (
+                          <button
+                            onClick={() => handleChangeUserRole(mgr._id, "user")}
+                            className="flex items-center gap-1 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[11px] font-bold text-red-300 hover:bg-red-500/15"
+                          >
+                            <UserMinus className="h-3.5 w-3.5" /> Remove Manager
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Approved Theatre Admins List */}
+                <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
+                  <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-red-400">
+                    <ShieldCheck className="h-4 w-4" /> Theatre Admins ({activeAdmins.length})
+                  </h3>
+                  <div className="space-y-3">
+                    {activeAdmins.map((adm) => (
+                      <div
+                        key={adm._id}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/80 p-3"
+                      >
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={
+                              adm.photoUrl ||
+                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                adm.username || "Admin"
+                              )}&background=dc2626&color=ffffff`
+                            }
+                            alt={adm.username}
+                            className="h-11 w-11 rounded-full border border-red-500/40 object-cover"
+                          />
+                          <div>
+                            <p className="text-xs font-bold text-white">{adm.username}</p>
+                            <p className="text-[11px] text-slate-400">{adm.email}</p>
+                            <p className="text-[11px] text-slate-300">
+                              {adm.phone ? `Mobile: ${adm.phone}` : "No mobile"}
+                              {adm.govtId ? ` • Govt ID: ${adm.govtId}` : ""}
+                            </p>
+                            <p className="text-[11px] text-amber-300">
+                              Theatre: {adm.theatreName || "Assigned Cinema"}
+                            </p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleChangeUserRole(adm._id, "user")}
+                          className="flex items-center gap-1 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[11px] font-bold text-red-300 hover:bg-red-500/15"
+                        >
+                          <UserMinus className="h-3.5 w-3.5" /> Remove Admin
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {requests.length > 0 && (
+                <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
+                  <h2 className="mb-4 flex items-center gap-2 text-base font-bold text-white">
+                    <Crown className="h-4 w-4 text-amber-400" />
+                    Pending Admin Requests ({requests.length})
+                  </h2>
+
                   <div className="grid gap-4 md:grid-cols-2">
                     {requests.map((reqUser) => (
                       <div
@@ -597,8 +739,8 @@ const AdminDashboard = () => {
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
 
               <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
                 <h2 className="mb-3 flex items-center gap-2 text-base font-bold text-white">
@@ -645,56 +787,28 @@ const AdminDashboard = () => {
                 </div>
               </div>
 
-              <div className="grid gap-6 lg:grid-cols-2">
-                <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
-                  <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-amber-300">
-                    <ShieldCheck className="h-4 w-4" /> Approved Theatre Admins ({activeAdmins.length})
-                  </h3>
-                  <div className="space-y-2.5">
-                    {activeAdmins.map((adm) => (
-                      <div
-                        key={adm._id}
-                        className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/80 p-3"
-                      >
-                        <div>
-                          <p className="text-xs font-bold text-white">{adm.username}</p>
-                          <p className="text-[11px] text-slate-400">{adm.email}</p>
-                          <p className="text-[11px] text-amber-300">Theatre: {adm.theatreName}</p>
-                        </div>
-                        <button
-                          onClick={() => handleChangeUserRole(adm._id, "user")}
-                          className="flex items-center gap-1 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[11px] font-bold text-red-300 hover:bg-red-500/15"
-                        >
-                          <UserMinus className="h-3.5 w-3.5" /> Remove Admin
-                        </button>
+              <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
+                <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-sky-300">
+                  <Users className="h-4 w-4" /> Registered Customers ({regularCustomers.length})
+                </h3>
+                <div className="max-h-80 space-y-2.5 overflow-y-auto pr-1">
+                  {regularCustomers.map((cust) => (
+                    <div
+                      key={cust._id}
+                      className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/80 p-3"
+                    >
+                      <div>
+                        <p className="text-xs font-bold text-white">{cust.username}</p>
+                        <p className="text-[11px] text-slate-400">{cust.email}</p>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
-                  <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-sky-300">
-                    <Users className="h-4 w-4" /> Registered Customers ({regularCustomers.length})
-                  </h3>
-                  <div className="max-h-80 space-y-2.5 overflow-y-auto pr-1">
-                    {regularCustomers.map((cust) => (
-                      <div
-                        key={cust._id}
-                        className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/80 p-3"
+                      <button
+                        onClick={() => handleChangeUserRole(cust._id, "admin")}
+                        className="flex items-center gap-1 rounded-lg border border-amber-500/40 px-2.5 py-1.5 text-[11px] font-bold text-amber-300 hover:bg-amber-500/15"
                       >
-                        <div>
-                          <p className="text-xs font-bold text-white">{cust.username}</p>
-                          <p className="text-[11px] text-slate-400">{cust.email}</p>
-                        </div>
-                        <button
-                          onClick={() => handleChangeUserRole(cust._id, "admin")}
-                          className="flex items-center gap-1 rounded-lg border border-amber-500/40 px-2.5 py-1.5 text-[11px] font-bold text-amber-300 hover:bg-amber-500/15"
-                        >
-                          <UserCheck className="h-3.5 w-3.5" /> Make Admin
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                        <UserCheck className="h-3.5 w-3.5" /> Make Admin
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

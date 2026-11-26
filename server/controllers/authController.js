@@ -18,7 +18,9 @@ const formatUser = (user) => ({
   id: user._id,
   username: user.username,
   email: user.email,
-  phone: user.phone,
+  phone: user.phone || "",
+  photoUrl: user.photoUrl || "",
+  govtId: user.govtId || "",
   role: user.role,
   isApproved: user.isApproved,
   theatreName: user.theatreName || user.theatreRequestName || "",
@@ -111,6 +113,7 @@ exports.googleLogin = async (req, res) => {
         password: randomHash,
         googleId,
         authProvider: "google",
+        photoUrl: payload.picture || "",
         phone: "",
         role: "user",
         isApproved: true,
@@ -120,6 +123,10 @@ exports.googleLogin = async (req, res) => {
       if (!user.googleId) {
         user.googleId = googleId;
         user.authProvider = "google";
+        updated = true;
+      }
+      if (!user.photoUrl && payload.picture) {
+        user.photoUrl = payload.picture;
         updated = true;
       }
       if (user.username === cleanEmail.split("@")[0] && displayName) {
@@ -139,10 +146,18 @@ exports.googleLogin = async (req, res) => {
   }
 };
 
-// Head Manager assigns a role ("admin", "manager", or "user") to any Gmail address
 exports.assignRoleByEmail = async (req, res) => {
   try {
-    const { email, role, theatreName = "" } = req.body;
+    const {
+      email,
+      role,
+      username = "",
+      phone = "",
+      photoUrl = "",
+      govtId = "",
+      theatreName = "",
+    } = req.body;
+
     const cleanEmail = String(email || "").trim().toLowerCase();
     const validRoles = ["user", "admin", "manager"];
 
@@ -153,15 +168,25 @@ exports.assignRoleByEmail = async (req, res) => {
       return res.status(400).json({ message: "Role must be user, admin, or manager." });
     }
     if (req.user.email === cleanEmail && role !== "manager") {
-      return res.status(400).json({ message: "You cannot downgrade your own Head Manager account." });
+      return res.status(400).json({ message: "You cannot remove your own Head Manager role." });
     }
 
+    const cleanName = String(username || "").trim();
+    const cleanPhone = String(phone || "").trim();
+    const cleanPhoto = String(photoUrl || "").trim();
+    const cleanGovtId = String(govtId || "").trim();
     const cleanTheatre = String(theatreName || "").trim();
+
     let user = await User.findOne({ email: cleanEmail });
 
     if (user) {
       user.role = role;
       user.isApproved = true;
+      if (cleanName) user.username = cleanName;
+      if (cleanPhone) user.phone = cleanPhone;
+      if (cleanPhoto) user.photoUrl = cleanPhoto;
+      if (cleanGovtId) user.govtId = cleanGovtId;
+
       if (role === "admin") {
         user.theatreName = cleanTheatre || user.theatreName || "Partner Cinema";
         user.theatreRequestName = user.theatreName;
@@ -173,10 +198,13 @@ exports.assignRoleByEmail = async (req, res) => {
     } else {
       const randomHash = await bcrypt.hash(crypto.randomBytes(24).toString("hex"), 10);
       user = await User.create({
-        username: cleanEmail.split("@")[0],
+        username: cleanName || cleanEmail.split("@")[0],
         email: cleanEmail,
         password: randomHash,
         authProvider: "google",
+        phone: cleanPhone,
+        photoUrl: cleanPhoto,
+        govtId: cleanGovtId,
         role,
         isApproved: true,
         theatreName: role === "admin" ? cleanTheatre || "Partner Cinema" : "",
@@ -197,9 +225,7 @@ exports.assignRoleByEmail = async (req, res) => {
     }
 
     res.json({
-      message: `${cleanEmail} is now set as ${role.toUpperCase()}${
-        user.theatreName ? ` (${user.theatreName})` : ""
-      }.`,
+      message: `${user.username} (${cleanEmail}) is now ${role.toUpperCase()}.`,
       user: formatUser(user),
     });
   } catch (err) {
@@ -213,10 +239,15 @@ exports.getProfile = async (req, res) => {
 
 exports.updateProfile = async (req, res) => {
   try {
-    const { username, phone } = req.body;
+    const { username, phone, photoUrl, govtId } = req.body;
     const user = await User.findByIdAndUpdate(
       req.user._id,
-      { ...(username && { username }), ...(phone !== undefined && { phone }) },
+      {
+        ...(username && { username }),
+        ...(phone !== undefined && { phone }),
+        ...(photoUrl !== undefined && { photoUrl }),
+        ...(govtId !== undefined && { govtId }),
+      },
       { new: true }
     ).select("-password");
     res.json({ user: formatUser(user) });
@@ -225,7 +256,6 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
-// ONLY unapproved admin applicants appear in Pending Admin Requests
 exports.getAdminRequests = async (req, res) => {
   try {
     const pendingAdmins = await User.find({ role: "admin", isApproved: false })

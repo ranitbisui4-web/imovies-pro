@@ -8,6 +8,8 @@ const userSchema = new mongoose.Schema(
     googleId: { type: String, default: "", index: true },
     authProvider: { type: String, enum: ["local", "google"], default: "local" },
     phone: { type: String, default: "", trim: true },
+    photoUrl: { type: String, default: "", trim: true },
+    govtId: { type: String, default: "", trim: true },
     role: { type: String, enum: ["user", "admin", "manager"], default: "user" },
     isApproved: { type: Boolean, default: true },
     theatreName: { type: String, default: "" },
