@@ -87,275 +87,289 @@ const Canteen = () => {
   };
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
-      {/* Header Banner */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-amber-500/25 bg-gradient-to-r from-amber-950/40 via-[#151310] to-[#111827] p-5">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-black text-white">
-            <Popcorn className="h-6 w-6 text-amber-400" />
-            iMovies Pro <span className="text-amber-400">Cinema Canteen</span>
-          </h1>
-          <p className="mt-0.5 text-xs text-amber-100/70">
-            Order snacks to your seat with any confirmed movie ticket. Cash orders include a ₹13 handling fee.
-          </p>
+    <div className="min-h-screen bg-[#FFFDF9] text-[#2B1E16]">
+      <div className="mx-auto max-w-6xl px-4 py-8">
+        {/* Warm Butter-Gold & Sand Hero Banner */}
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-[#EADBC1] bg-gradient-to-r from-[#F6D365] via-[#F9E396] to-[#F7EEDB] p-6 shadow-sm">
+          <div>
+            <span className="inline-block rounded-full bg-[#A8641D]/15 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#8C5115]">
+              Freshly Prepared • Seat Delivery
+            </span>
+            <h1 className="mt-1.5 flex items-center gap-2 text-2xl font-black tracking-tight text-[#2B1E16] sm:text-3xl">
+              <Popcorn className="h-7 w-7 text-[#A8641D]" />
+              iMovies Pro <span className="text-[#A8641D]">Cinema Canteen</span>
+            </h1>
+            <p className="mt-1 text-xs font-medium text-[#5C4634]">
+              Order gourmet snacks directly to your seat with any confirmed ticket. Cash orders include a ₹13 handling fee.
+            </p>
+          </div>
+
+          {loyalty && (
+            <div className="rounded-2xl border border-[#E2C89D] bg-[#FFFDF9]/90 px-4 py-3 text-xs shadow-sm backdrop-blur-sm">
+              <p className="flex items-center gap-1.5 font-extrabold text-[#A8641D]">
+                <Award className="h-4 w-4 text-[#D9822B]" /> 7 Movies in 57 Days Reward:{" "}
+                {loyalty.moviesWatchedIn57Days}/{loyalty.requiredMovies}
+              </p>
+              <p className="mt-0.5 text-[11px] font-medium text-[#5C4634]">
+                {loyalty.eligible
+                  ? `ACTIVE: 36% Off + Free ${loyalty.popcornBucketReward}`
+                  : `Watch ${loyalty.requiredMovies - loyalty.moviesWatchedIn57Days} more movie(s) within 57 days for 36% off + Popcorn Bucket!`}
+              </p>
+            </div>
+          )}
         </div>
 
-        {loyalty && (
-          <div className="rounded-2xl border border-amber-400/40 bg-amber-500/15 px-4 py-2.5 text-xs">
-            <p className="flex items-center gap-1.5 font-bold text-amber-300">
-              <Award className="h-4 w-4 text-amber-400" /> 7 Movies in 57 Days Reward:{" "}
-              {loyalty.moviesWatchedIn57Days}/{loyalty.requiredMovies}
-            </p>
-            <p className="text-[11px] text-amber-100/80">
-              {loyalty.eligible
-                ? `ACTIVE: 36% Off + Free ${loyalty.popcornBucketReward}`
-                : `Watch ${loyalty.requiredMovies - loyalty.moviesWatchedIn57Days} more movie(s) within 57 days to unlock 36% off + Popcorn Bucket!`}
-            </p>
+        {statusMsg && (
+          <div className="mb-6 rounded-2xl border border-[#D4B483] bg-[#F7EEDB] px-4 py-3 text-xs font-bold text-[#7A4410]">
+            {statusMsg}
           </div>
         )}
-      </div>
 
-      {statusMsg && (
-        <div className="mb-5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-4 py-2.5 text-xs font-semibold text-amber-200">
-          {statusMsg}
-        </div>
-      )}
-
-      {/* Admin / Manager Add Canteen Item Form */}
-      {isElevated && (
-        <form
-          onSubmit={handleAddItem}
-          className="mb-8 space-y-3 rounded-3xl border border-amber-500/30 bg-[#16130f] p-5"
-        >
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <input
-              required
-              value={newItem.name}
-              onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-              placeholder="Snack / Popcorn Name *"
-              className="rounded-xl border border-amber-500/25 bg-stone-900/90 px-3 py-2 text-xs text-white outline-none focus:border-amber-400"
-            />
-            <input
-              type="number"
-              min="1"
-              required
-              value={newItem.price}
-              onChange={(e) => setNewItem({ ...newItem, price: Number(e.target.value) })}
-              placeholder="Price ₹ *"
-              className="rounded-xl border border-amber-500/25 bg-stone-900/90 px-3 py-2 text-xs text-white outline-none focus:border-amber-400"
-            />
-            <input
-              type="url"
-              value={newItem.imageUrl}
-              onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
-              placeholder="Food Photo URL (https://...)"
-              className="rounded-xl border border-amber-500/25 bg-stone-900/90 px-3 py-2 text-xs text-white outline-none focus:border-amber-400"
-            />
-          </div>
-
-          <textarea
-            rows={2}
-            value={newItem.description}
-            onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-            placeholder="Food description (ingredients, size, flavor, or combo details...)"
-            className="w-full rounded-xl border border-amber-500/25 bg-stone-900/90 px-3 py-2 text-xs text-white outline-none focus:border-amber-400"
-          />
-
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <label className="flex items-center gap-1.5 text-xs text-amber-300">
+        {/* Admin / Manager Add Canteen Item Form */}
+        {isElevated && (
+          <form
+            onSubmit={handleAddItem}
+            className="mb-8 space-y-3 rounded-3xl border border-[#EADBC1] bg-[#F7EEDB] p-6 shadow-sm"
+          >
+            <p className="text-xs font-extrabold uppercase tracking-wider text-[#8C5115]">
+              Add New Menu Item
+            </p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <input
-                type="checkbox"
-                checked={newItem.isPopcornBucketReward}
-                onChange={(e) =>
-                  setNewItem({ ...newItem, isPopcornBucketReward: e.target.checked })
-                }
-                className="accent-amber-400"
+                required
+                value={newItem.name}
+                onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                placeholder="Snack / Popcorn Name *"
+                className="rounded-xl border border-[#E2C89D] bg-[#FFFDF9] px-3.5 py-2.5 text-xs text-[#2B1E16] placeholder-[#9C846C] outline-none focus:border-[#A8641D]"
               />
-              Set as 7-in-57 Free Popcorn Bucket
-            </label>
-            <button
-              type="submit"
-              className="flex items-center gap-1 rounded-xl bg-amber-500 px-4 py-2 text-xs font-black text-slate-950 hover:bg-amber-400"
-            >
-              <Plus className="h-3.5 w-3.5" /> Add Canteen Item
-            </button>
-          </div>
-        </form>
-      )}
-
-      <div className="grid gap-8 lg:grid-cols-[1fr,340px]">
-        {/* Food Menu Grid */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          {items.length === 0 ? (
-            <div className="col-span-2 rounded-2xl border border-amber-500/20 bg-[#16130f] p-8 text-center text-xs text-amber-200/70">
-              No canteen items added yet. Admin/Manager can add snacks above.
+              <input
+                type="number"
+                min="1"
+                required
+                value={newItem.price}
+                onChange={(e) => setNewItem({ ...newItem, price: Number(e.target.value) })}
+                placeholder="Price ₹ *"
+                className="rounded-xl border border-[#E2C89D] bg-[#FFFDF9] px-3.5 py-2.5 text-xs text-[#2B1E16] placeholder-[#9C846C] outline-none focus:border-[#A8641D]"
+              />
+              <input
+                type="url"
+                value={newItem.imageUrl}
+                onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
+                placeholder="Food Photo URL (https://...)"
+                className="rounded-xl border border-[#E2C89D] bg-[#FFFDF9] px-3.5 py-2.5 text-xs text-[#2B1E16] placeholder-[#9C846C] outline-none focus:border-[#A8641D]"
+              />
             </div>
-          ) : (
-            items.map((item) => (
-              <div
-                key={item._id}
-                className="flex flex-col justify-between overflow-hidden rounded-2xl border border-amber-500/20 bg-[#16130f] transition hover:border-amber-400/50"
+
+            <textarea
+              rows={2}
+              value={newItem.description}
+              onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+              placeholder="Food description (ingredients, size, flavor, or combo details...)"
+              className="w-full rounded-xl border border-[#E2C89D] bg-[#FFFDF9] px-3.5 py-2.5 text-xs text-[#2B1E16] placeholder-[#9C846C] outline-none focus:border-[#A8641D]"
+            />
+
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+              <label className="flex items-center gap-2 text-xs font-semibold text-[#5C4634]">
+                <input
+                  type="checkbox"
+                  checked={newItem.isPopcornBucketReward}
+                  onChange={(e) =>
+                    setNewItem({ ...newItem, isPopcornBucketReward: e.target.checked })
+                  }
+                  className="accent-[#A8641D]"
+                />
+                Set as 7-in-57 Free Popcorn Bucket
+              </label>
+              <button
+                type="submit"
+                className="flex items-center gap-1.5 rounded-full bg-[#A8641D] px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#8C5115]"
               >
-                <div>
-                  {item.imageUrl ? (
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      className="h-36 w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-28 w-full items-center justify-center bg-gradient-to-br from-amber-950/50 to-stone-900 text-amber-400/50">
-                      <Popcorn className="h-8 w-8" />
+                <Plus className="h-3.5 w-3.5" /> Publish Item
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="grid gap-8 lg:grid-cols-[1fr,350px]">
+          {/* Warm Sand-Cream Food Menu Grid */}
+          <div className="grid gap-5 sm:grid-cols-2">
+            {items.length === 0 ? (
+              <div className="col-span-2 rounded-3xl border border-[#EADBC1] bg-[#F7EEDB] p-10 text-center text-xs font-medium text-[#7A624D]">
+                No canteen items added yet. Admin or Head Manager can publish snacks above.
+              </div>
+            ) : (
+              items.map((item) => (
+                <div
+                  key={item._id}
+                  className="flex flex-col justify-between overflow-hidden rounded-3xl border border-[#EADBC1] bg-[#F7EEDB] shadow-sm transition hover:-translate-y-0.5 hover:border-[#D4B483] hover:shadow-md"
+                >
+                  <div>
+                    <div className="p-3 pb-0">
+                      {item.imageUrl ? (
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="h-40 w-full rounded-2xl bg-[#FFFDF9] object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-36 w-full items-center justify-center rounded-2xl bg-[#FFFDF9] text-[#D4B483]">
+                          <Popcorn className="h-10 w-10" />
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-2">
-                      <h3 className="text-sm font-bold text-white">{item.name}</h3>
-                      <span className="rounded-lg bg-amber-500/15 px-2 py-0.5 text-sm font-black text-amber-300">
-                        ₹{item.price}
-                      </span>
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <h3 className="text-base font-extrabold text-[#2B1E16]">{item.name}</h3>
+                        <span className="rounded-full bg-[#F2C94C] px-3 py-0.5 text-xs font-black text-[#2B1E16]">
+                          ₹{item.price}
+                        </span>
+                      </div>
+
+                      {item.description && (
+                        <p className="mt-1.5 text-xs leading-relaxed text-[#6B533E]">
+                          {item.description}
+                        </p>
+                      )}
+
+                      {item.isPopcornBucketReward && (
+                        <span className="mt-2.5 inline-block rounded-full bg-[#A8641D]/15 px-2.5 py-0.5 text-[10px] font-extrabold text-[#8C5115]">
+                          7-in-57 Loyalty Popcorn Bucket
+                        </span>
+                      )}
                     </div>
-
-                    {item.description && (
-                      <p className="mt-1.5 text-xs text-stone-300/80">{item.description}</p>
-                    )}
-
-                    {item.isPopcornBucketReward && (
-                      <span className="mt-2 inline-block rounded bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
-                        7-in-57 Loyalty Popcorn Bucket
-                      </span>
-                    )}
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between border-t border-amber-500/15 px-4 py-3">
-                  <span className="text-[11px] font-medium text-amber-200/60">
-                    {item.category || "Snacks"}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => updateQty(item._id, -1)}
-                      className="h-7 w-7 rounded-lg border border-amber-500/30 text-xs font-bold text-amber-200 hover:bg-amber-500/15"
-                    >
-                      -
-                    </button>
-                    <span className="w-5 text-center text-xs font-bold text-white">
-                      {cart[item._id] || 0}
+                  <div className="flex items-center justify-between border-t border-[#EADBC1] bg-[#FFFDF9]/60 px-4 py-3">
+                    <span className="text-[11px] font-bold uppercase tracking-wide text-[#8C735B]">
+                      {item.category || "Snacks"}
                     </span>
-                    <button
-                      type="button"
-                      onClick={() => updateQty(item._id, 1)}
-                      className="h-7 w-7 rounded-lg bg-amber-500 text-xs font-black text-slate-950 hover:bg-amber-400"
-                    >
-                      +
-                    </button>
-                    {isElevated && (
+
+                    <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={async () => {
-                          await api.delete(`/canteen/items/${item._id}`);
-                          loadCanteen();
-                        }}
-                        className="ml-1 text-rose-400 hover:text-rose-300"
+                        onClick={() => updateQty(item._id, -1)}
+                        className="h-7 w-7 rounded-full border border-[#D4B483] bg-[#FFFDF9] text-xs font-extrabold text-[#2B1E16] transition hover:bg-[#EADBC1]/50"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        -
                       </button>
-                    )}
+                      <span className="w-5 text-center text-xs font-black text-[#2B1E16]">
+                        {cart[item._id] || 0}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => updateQty(item._id, 1)}
+                        className="h-7 w-7 rounded-full bg-[#A8641D] text-xs font-extrabold text-white transition hover:bg-[#8C5115]"
+                      >
+                        +
+                      </button>
+                      {isElevated && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            await api.delete(`/canteen/items/${item._id}`);
+                            loadCanteen();
+                          }}
+                          className="ml-1 text-[#B83A2D] hover:text-[#8F281E]"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              ))
+            )}
+          </div>
 
-        {/* Order Checkout Box */}
-        <div className="h-fit space-y-4 rounded-3xl border border-amber-500/30 bg-[#16130f] p-5 text-xs">
-          <h2 className="flex items-center gap-2 text-base font-bold text-white">
-            <ShoppingBag className="h-4 w-4 text-amber-400" /> Canteen Checkout
-          </h2>
+          {/* Premium Cream & Caramel Checkout Box */}
+          <div className="h-fit space-y-4 rounded-3xl border border-[#EADBC1] bg-[#F7EEDB] p-6 text-xs shadow-sm">
+            <h2 className="flex items-center gap-2 text-base font-black text-[#2B1E16]">
+              <ShoppingBag className="h-4 w-4 text-[#A8641D]" /> Canteen Checkout
+            </h2>
 
-          {!canOrderFood ? (
-            <p className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-amber-200">
-              Book a movie ticket first to unlock Canteen ordering.
-            </p>
-          ) : (
-            <>
-              <div>
-                <label className="mb-1 block text-amber-200/70">Select Confirmed Ticket</label>
-                <select
-                  value={selectedBooking}
-                  onChange={(e) => setSelectedBooking(e.target.value)}
-                  className="w-full rounded-xl border border-amber-500/25 bg-stone-900 px-3 py-2 text-white outline-none focus:border-amber-400"
-                >
-                  {bookings.map((b) => (
-                    <option key={b._id} value={b._id}>
-                      {b.movieTitle} ({b.bookingId}) — Seats {b.seats.join(", ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {!canOrderFood ? (
+              <p className="rounded-2xl border border-[#E2C89D] bg-[#FFFDF9] p-3.5 font-medium text-[#6B533E]">
+                Book a movie ticket first to unlock Canteen ordering.
+              </p>
+            ) : (
+              <>
+                <div>
+                  <label className="mb-1.5 block font-bold text-[#5C4634]">
+                    Select Confirmed Ticket
+                  </label>
+                  <select
+                    value={selectedBooking}
+                    onChange={(e) => setSelectedBooking(e.target.value)}
+                    className="w-full rounded-xl border border-[#E2C89D] bg-[#FFFDF9] px-3 py-2.5 font-medium text-[#2B1E16] outline-none focus:border-[#A8641D]"
+                  >
+                    {bookings.map((b) => (
+                      <option key={b._id} value={b._id}>
+                        {b.movieTitle} ({b.bookingId}) — Seats {b.seats.join(", ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-              <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMode("ONLINE")}
+                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 font-bold transition ${
+                      paymentMode === "ONLINE"
+                        ? "border-[#A8641D] bg-[#A8641D] text-white"
+                        : "border-[#E2C89D] bg-[#FFFDF9] text-[#5C4634]"
+                    }`}
+                  >
+                    <CreditCard className="h-3.5 w-3.5" /> Online (₹0 fee)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMode("CASH")}
+                    className={`flex items-center justify-center gap-1.5 rounded-xl border py-2.5 font-bold transition ${
+                      paymentMode === "CASH"
+                        ? "border-[#A8641D] bg-[#A8641D] text-white"
+                        : "border-[#E2C89D] bg-[#FFFDF9] text-[#5C4634]"
+                    }`}
+                  >
+                    <Banknote className="h-3.5 w-3.5" /> Cash (+₹13 fee)
+                  </button>
+                </div>
+
+                <div className="space-y-2 rounded-2xl border border-[#EADBC1] bg-[#FFFDF9] p-4">
+                  <div className="flex justify-between font-medium text-[#6B533E]">
+                    <span>Items Subtotal</span>
+                    <span>₹{subtotal}</span>
+                  </div>
+                  {discount36 > 0 && (
+                    <div className="flex justify-between font-bold text-[#2E7D32]">
+                      <span>7-in-57 Loyalty (36% Off)</span>
+                      <span>-₹{discount36}</span>
+                    </div>
+                  )}
+                  {cashFee > 0 && (
+                    <div className="flex justify-between font-bold text-[#A8641D]">
+                      <span>Cash Handling Fee</span>
+                      <span>+₹13</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-[#EADBC1] pt-2.5 text-sm font-black text-[#2B1E16]">
+                    <span>Total Payable</span>
+                    <span>₹{finalTotal}</span>
+                  </div>
+                </div>
+
                 <button
                   type="button"
-                  onClick={() => setPaymentMode("ONLINE")}
-                  className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 font-bold ${
-                    paymentMode === "ONLINE"
-                      ? "border-amber-400 bg-amber-500/20 text-amber-200"
-                      : "border-stone-700 text-stone-300"
-                  }`}
+                  disabled={subtotal === 0}
+                  onClick={handlePlaceOrder}
+                  className="w-full rounded-full bg-[#A8641D] py-3 font-extrabold text-white shadow-sm transition hover:bg-[#8C5115] disabled:opacity-40"
                 >
-                  <CreditCard className="h-3.5 w-3.5" /> Online (₹0 fee)
+                  Place Canteen Order
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setPaymentMode("CASH")}
-                  className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 font-bold ${
-                    paymentMode === "CASH"
-                      ? "border-amber-400 bg-amber-500/20 text-amber-200"
-                      : "border-stone-700 text-stone-300"
-                  }`}
-                >
-                  <Banknote className="h-3.5 w-3.5" /> Cash (+₹13 fee)
-                </button>
-              </div>
-
-              <div className="space-y-1.5 border-t border-amber-500/20 pt-3">
-                <div className="flex justify-between text-stone-300">
-                  <span>Items Subtotal</span>
-                  <span>₹{subtotal}</span>
-                </div>
-                {discount36 > 0 && (
-                  <div className="flex justify-between text-emerald-400">
-                    <span>7-in-57 Loyalty (36% Off)</span>
-                    <span>-₹{discount36}</span>
-                  </div>
-                )}
-                {cashFee > 0 && (
-                  <div className="flex justify-between text-amber-300">
-                    <span>Cash Handling Fee</span>
-                    <span>+₹13</span>
-                  </div>
-                )}
-                <div className="flex justify-between border-t border-amber-500/20 pt-2 text-sm font-black text-amber-300">
-                  <span>Total Payable</span>
-                  <span>₹{finalTotal}</span>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                disabled={subtotal === 0}
-                onClick={handlePlaceOrder}
-                className="w-full rounded-xl bg-amber-500 py-2.5 font-black text-slate-950 hover:bg-amber-400 disabled:opacity-40"
-              >
-                Place Canteen Order
-              </button>
-            </>
-          )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
