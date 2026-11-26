@@ -88,24 +88,25 @@ const Canteen = () => {
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      {/* Header Banner */}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-amber-500/25 bg-gradient-to-r from-amber-950/40 via-[#151310] to-[#111827] p-5">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-black text-white">
             <Popcorn className="h-6 w-6 text-amber-400" />
-            iMovies Pro <span className="text-red-500">Cinema Canteen</span>
+            iMovies Pro <span className="text-amber-400">Cinema Canteen</span>
           </h1>
-          <p className="text-xs text-slate-400">
+          <p className="mt-0.5 text-xs text-amber-100/70">
             Order snacks to your seat with any confirmed movie ticket. Cash orders include a ₹13 handling fee.
           </p>
         </div>
 
         {loyalty && (
-          <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs">
+          <div className="rounded-2xl border border-amber-400/40 bg-amber-500/15 px-4 py-2.5 text-xs">
             <p className="flex items-center gap-1.5 font-bold text-amber-300">
-              <Award className="h-4 w-4" /> 7 Movies in 57 Days Reward:{" "}
+              <Award className="h-4 w-4 text-amber-400" /> 7 Movies in 57 Days Reward:{" "}
               {loyalty.moviesWatchedIn57Days}/{loyalty.requiredMovies}
             </p>
-            <p className="text-[11px] text-slate-300">
+            <p className="text-[11px] text-amber-100/80">
               {loyalty.eligible
                 ? `ACTIVE: 36% Off + Free ${loyalty.popcornBucketReward}`
                 : `Watch ${loyalty.requiredMovies - loyalty.moviesWatchedIn57Days} more movie(s) within 57 days to unlock 36% off + Popcorn Bucket!`}
@@ -115,15 +116,16 @@ const Canteen = () => {
       </div>
 
       {statusMsg && (
-        <div className="mb-5 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 py-2.5 text-xs font-semibold text-emerald-300">
+        <div className="mb-5 rounded-xl border border-amber-400/40 bg-amber-500/15 px-4 py-2.5 text-xs font-semibold text-amber-200">
           {statusMsg}
         </div>
       )}
 
+      {/* Admin / Manager Add Canteen Item Form */}
       {isElevated && (
         <form
           onSubmit={handleAddItem}
-          className="mb-8 space-y-3 rounded-3xl border border-slate-800 bg-[#111827] p-5"
+          className="mb-8 space-y-3 rounded-3xl border border-amber-500/30 bg-[#16130f] p-5"
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <input
@@ -131,7 +133,7 @@ const Canteen = () => {
               value={newItem.name}
               onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
               placeholder="Snack / Popcorn Name *"
-              className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
+              className="rounded-xl border border-amber-500/25 bg-stone-900/90 px-3 py-2 text-xs text-white outline-none focus:border-amber-400"
             />
             <input
               type="number"
@@ -140,14 +142,14 @@ const Canteen = () => {
               value={newItem.price}
               onChange={(e) => setNewItem({ ...newItem, price: Number(e.target.value) })}
               placeholder="Price ₹ *"
-              className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
+              className="rounded-xl border border-amber-500/25 bg-stone-900/90 px-3 py-2 text-xs text-white outline-none focus:border-amber-400"
             />
             <input
               type="url"
               value={newItem.imageUrl}
               onChange={(e) => setNewItem({ ...newItem, imageUrl: e.target.value })}
               placeholder="Food Photo URL (https://...)"
-              className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
+              className="rounded-xl border border-amber-500/25 bg-stone-900/90 px-3 py-2 text-xs text-white outline-none focus:border-amber-400"
             />
           </div>
 
@@ -156,7 +158,7 @@ const Canteen = () => {
             value={newItem.description}
             onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
             placeholder="Food description (ingredients, size, flavor, or combo details...)"
-            className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
+            className="w-full rounded-xl border border-amber-500/25 bg-stone-900/90 px-3 py-2 text-xs text-white outline-none focus:border-amber-400"
           />
 
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -167,12 +169,13 @@ const Canteen = () => {
                 onChange={(e) =>
                   setNewItem({ ...newItem, isPopcornBucketReward: e.target.checked })
                 }
+                className="accent-amber-400"
               />
               Set as 7-in-57 Free Popcorn Bucket
             </label>
             <button
               type="submit"
-              className="flex items-center gap-1 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white hover:bg-red-700"
+              className="flex items-center gap-1 rounded-xl bg-amber-500 px-4 py-2 text-xs font-black text-slate-950 hover:bg-amber-400"
             >
               <Plus className="h-3.5 w-3.5" /> Add Canteen Item
             </button>
@@ -181,16 +184,17 @@ const Canteen = () => {
       )}
 
       <div className="grid gap-8 lg:grid-cols-[1fr,340px]">
+        {/* Food Menu Grid */}
         <div className="grid gap-4 sm:grid-cols-2">
           {items.length === 0 ? (
-            <div className="col-span-2 rounded-2xl border border-slate-800 bg-[#111827] p-8 text-center text-xs text-slate-400">
+            <div className="col-span-2 rounded-2xl border border-amber-500/20 bg-[#16130f] p-8 text-center text-xs text-amber-200/70">
               No canteen items added yet. Admin/Manager can add snacks above.
             </div>
           ) : (
             items.map((item) => (
               <div
                 key={item._id}
-                className="flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-800 bg-[#111827]"
+                className="flex flex-col justify-between overflow-hidden rounded-2xl border border-amber-500/20 bg-[#16130f] transition hover:border-amber-400/50"
               >
                 <div>
                   {item.imageUrl ? (
@@ -200,7 +204,7 @@ const Canteen = () => {
                       className="h-36 w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-28 w-full items-center justify-center bg-slate-900 text-slate-600">
+                    <div className="flex h-28 w-full items-center justify-center bg-gradient-to-br from-amber-950/50 to-stone-900 text-amber-400/50">
                       <Popcorn className="h-8 w-8" />
                     </div>
                   )}
@@ -208,29 +212,33 @@ const Canteen = () => {
                   <div className="p-4">
                     <div className="flex items-start justify-between gap-2">
                       <h3 className="text-sm font-bold text-white">{item.name}</h3>
-                      <span className="text-sm font-black text-emerald-400">₹{item.price}</span>
+                      <span className="rounded-lg bg-amber-500/15 px-2 py-0.5 text-sm font-black text-amber-300">
+                        ₹{item.price}
+                      </span>
                     </div>
 
                     {item.description && (
-                      <p className="mt-1 text-xs text-slate-400">{item.description}</p>
+                      <p className="mt-1.5 text-xs text-stone-300/80">{item.description}</p>
                     )}
 
                     {item.isPopcornBucketReward && (
-                      <span className="mt-2 inline-block rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
+                      <span className="mt-2 inline-block rounded bg-amber-400/20 px-2 py-0.5 text-[10px] font-bold text-amber-300">
                         7-in-57 Loyalty Popcorn Bucket
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-slate-800/80 px-4 py-3">
-                  <span className="text-[11px] text-slate-400">{item.category || "Snacks"}</span>
+                <div className="flex items-center justify-between border-t border-amber-500/15 px-4 py-3">
+                  <span className="text-[11px] font-medium text-amber-200/60">
+                    {item.category || "Snacks"}
+                  </span>
 
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => updateQty(item._id, -1)}
-                      className="h-7 w-7 rounded-lg border border-slate-700 text-xs font-bold text-white"
+                      className="h-7 w-7 rounded-lg border border-amber-500/30 text-xs font-bold text-amber-200 hover:bg-amber-500/15"
                     >
                       -
                     </button>
@@ -240,7 +248,7 @@ const Canteen = () => {
                     <button
                       type="button"
                       onClick={() => updateQty(item._id, 1)}
-                      className="h-7 w-7 rounded-lg bg-red-600 text-xs font-bold text-white"
+                      className="h-7 w-7 rounded-lg bg-amber-500 text-xs font-black text-slate-950 hover:bg-amber-400"
                     >
                       +
                     </button>
@@ -251,7 +259,7 @@ const Canteen = () => {
                           await api.delete(`/canteen/items/${item._id}`);
                           loadCanteen();
                         }}
-                        className="ml-1 text-red-400 hover:text-red-300"
+                        className="ml-1 text-rose-400 hover:text-rose-300"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -264,9 +272,9 @@ const Canteen = () => {
         </div>
 
         {/* Order Checkout Box */}
-        <div className="h-fit space-y-4 rounded-3xl border border-slate-800 bg-[#111827] p-5 text-xs">
+        <div className="h-fit space-y-4 rounded-3xl border border-amber-500/30 bg-[#16130f] p-5 text-xs">
           <h2 className="flex items-center gap-2 text-base font-bold text-white">
-            <ShoppingBag className="h-4 w-4 text-red-400" /> Canteen Checkout
+            <ShoppingBag className="h-4 w-4 text-amber-400" /> Canteen Checkout
           </h2>
 
           {!canOrderFood ? (
@@ -276,11 +284,11 @@ const Canteen = () => {
           ) : (
             <>
               <div>
-                <label className="mb-1 block text-slate-400">Select Confirmed Ticket</label>
+                <label className="mb-1 block text-amber-200/70">Select Confirmed Ticket</label>
                 <select
                   value={selectedBooking}
                   onChange={(e) => setSelectedBooking(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+                  className="w-full rounded-xl border border-amber-500/25 bg-stone-900 px-3 py-2 text-white outline-none focus:border-amber-400"
                 >
                   {bookings.map((b) => (
                     <option key={b._id} value={b._id}>
@@ -296,8 +304,8 @@ const Canteen = () => {
                   onClick={() => setPaymentMode("ONLINE")}
                   className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 font-bold ${
                     paymentMode === "ONLINE"
-                      ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
-                      : "border-slate-700 text-slate-300"
+                      ? "border-amber-400 bg-amber-500/20 text-amber-200"
+                      : "border-stone-700 text-stone-300"
                   }`}
                 >
                   <CreditCard className="h-3.5 w-3.5" /> Online (₹0 fee)
@@ -307,16 +315,16 @@ const Canteen = () => {
                   onClick={() => setPaymentMode("CASH")}
                   className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 font-bold ${
                     paymentMode === "CASH"
-                      ? "border-amber-500 bg-amber-500/15 text-amber-300"
-                      : "border-slate-700 text-slate-300"
+                      ? "border-amber-400 bg-amber-500/20 text-amber-200"
+                      : "border-stone-700 text-stone-300"
                   }`}
                 >
                   <Banknote className="h-3.5 w-3.5" /> Cash (+₹13 fee)
                 </button>
               </div>
 
-              <div className="space-y-1.5 border-t border-slate-800 pt-3">
-                <div className="flex justify-between text-slate-400">
+              <div className="space-y-1.5 border-t border-amber-500/20 pt-3">
+                <div className="flex justify-between text-stone-300">
                   <span>Items Subtotal</span>
                   <span>₹{subtotal}</span>
                 </div>
@@ -332,7 +340,7 @@ const Canteen = () => {
                     <span>+₹13</span>
                   </div>
                 )}
-                <div className="flex justify-between border-t border-slate-800 pt-2 text-sm font-black text-white">
+                <div className="flex justify-between border-t border-amber-500/20 pt-2 text-sm font-black text-amber-300">
                   <span>Total Payable</span>
                   <span>₹{finalTotal}</span>
                 </div>
@@ -342,7 +350,7 @@ const Canteen = () => {
                 type="button"
                 disabled={subtotal === 0}
                 onClick={handlePlaceOrder}
-                className="w-full rounded-xl bg-red-600 py-2.5 font-bold text-white hover:bg-red-700 disabled:opacity-40"
+                className="w-full rounded-xl bg-amber-500 py-2.5 font-black text-slate-950 hover:bg-amber-400 disabled:opacity-40"
               >
                 Place Canteen Order
               </button>
