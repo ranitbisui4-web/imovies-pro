@@ -110,11 +110,21 @@ const AdminDashboard = () => {
     showtime: "19:30",
   });
 
+  const fetchBookingsList = async () => {
+    try {
+      const res = await api.get("/bookings");
+      return res.data;
+    } catch {
+      const fallbackRes = await api.get("/bookings/all").catch(() => ({ data: [] }));
+      return fallbackRes.data;
+    }
+  };
+
   const loadAll = async () => {
     setLoading(true);
     try {
       const citiesRes = await api.get("/manager/cities").catch(() => ({ data: [] }));
-      const cityList = citiesRes.data || [];
+      const cityList = Array.isArray(citiesRes.data) ? citiesRes.data : [];
       setCities(cityList);
 
       if (!isApprovedAdmin) {
@@ -123,28 +133,35 @@ const AdminDashboard = () => {
         return;
       }
 
-      const [m, t, s, b, ban] = await Promise.all([
-        api.get("/movies"),
-        api.get("/theatres"),
-        api.get("/shows"),
-        api.get("/bookings"),
+      const [m, t, s, bData, ban] = await Promise.all([
+        api.get("/movies").catch(() => ({ data: [] })),
+        api.get("/theatres").catch(() => ({ data: [] })),
+        api.get("/shows").catch(() => ({ data: [] })),
+        fetchBookingsList(),
         api.get("/banners").catch(() => ({ data: [] })),
       ]);
-      setMovies(m.data);
-      setTheatres(t.data);
-      setShows(s.data);
-      setBookings(b.data);
-      setBanners(ban.data);
+
+      const movieList = Array.isArray(m.data) ? m.data : m.data?.movies || [];
+      const theatreList = Array.isArray(t.data) ? t.data : t.data?.theatres || [];
+      const showList = Array.isArray(s.data) ? s.data : s.data?.shows || [];
+      const bookingList = Array.isArray(bData) ? bData : bData?.bookings || [];
+      const bannerList = Array.isArray(ban.data) ? ban.data : ban.data?.banners || [];
+
+      setMovies(movieList);
+      setTheatres(theatreList);
+      setShows(showList);
+      setBookings(bookingList);
+      setBanners(bannerList);
 
       setShowForm((prev) => ({
         ...prev,
-        movie: prev.movie || m.data[0]?._id || "",
-        theatre: prev.theatre || t.data[0]?._id || "",
+        movie: prev.movie || movieList[0]?._id || "",
+        theatre: prev.theatre || theatreList[0]?._id || "",
       }));
 
       setBannerForm((prev) => ({
         ...prev,
-        movie: prev.movie || m.data[0]?._id || "",
+        movie: prev.movie || movieList[0]?._id || "",
       }));
 
       setTheatreForm((prev) => ({
@@ -154,11 +171,11 @@ const AdminDashboard = () => {
 
       if (isManager) {
         const [reqRes, usersRes] = await Promise.all([
-          api.get("/manager/requests"),
-          api.get("/manager/users"),
+          api.get("/manager/requests").catch(() => ({ data: [] })),
+          api.get("/manager/users").catch(() => ({ data: [] })),
         ]);
-        setRequests(reqRes.data);
-        setAllUsers(usersRes.data);
+        setRequests(Array.isArray(reqRes.data) ? reqRes.data : []);
+        setAllUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
       }
     } finally {
       setLoading(false);
@@ -168,6 +185,21 @@ const AdminDashboard = () => {
   useEffect(() => {
     loadAll();
   }, [isApprovedAdmin, isManager]);
+
+  useEffect(() => {
+    setShowForm((prev) => ({
+      ...prev,
+      movie: prev.movie || movies[0]?._id || "",
+      theatre: prev.theatre || theatres[0]?._id || "",
+    }));
+  }, [movies, theatres]);
+
+  useEffect(() => {
+    setBannerForm((prev) => ({
+      ...prev,
+      movie: prev.movie || movies[0]?._id || "",
+    }));
+  }, [movies]);
 
   const notify = (msg) => {
     setStatusMsg(msg);
@@ -205,16 +237,20 @@ const AdminDashboard = () => {
 
   const handleSaveMovie = async (e) => {
     e.preventDefault();
-    if (editingMovieId) {
-      await api.put(`/movies/${editingMovieId}`, movieForm);
-      notify(`Updated "${movieForm.movieName}" successfully.`);
-      setEditingMovieId(null);
-    } else {
-      await api.post("/movies", movieForm);
-      notify(`Added "${movieForm.movieName}" and notified customers.`);
+    try {
+      if (editingMovieId) {
+        await api.put(`/movies/${editingMovieId}`, movieForm);
+        notify(`Updated "${movieForm.movieName}" successfully.`);
+        setEditingMovieId(null);
+      } else {
+        await api.post("/movies", movieForm);
+        notify(`Added "${movieForm.movieName}" and notified customers.`);
+      }
+      setMovieForm(EMPTY_MOVIE);
+      loadAll();
+    } catch (err) {
+      notify(err.response?.data?.message || "Failed to save movie.");
     }
-    setMovieForm(EMPTY_MOVIE);
-    loadAll();
   };
 
   const startEditMovie = (m) => {
@@ -240,16 +276,20 @@ const AdminDashboard = () => {
       notify("Select a city from the Manager City List first.");
       return;
     }
-    if (editingTheatreId) {
-      await api.put(`/theatres/${editingTheatreId}`, theatreForm);
-      notify(`Updated theatre "${theatreForm.theatreName}".`);
-      setEditingTheatreId(null);
-    } else {
-      await api.post("/theatres", theatreForm);
-      notify(`Added theatre "${theatreForm.theatreName}".`);
+    try {
+      if (editingTheatreId) {
+        await api.put(`/theatres/${editingTheatreId}`, theatreForm);
+        notify(`Updated theatre "${theatreForm.theatreName}".`);
+        setEditingTheatreId(null);
+      } else {
+        await api.post("/theatres", theatreForm);
+        notify(`Added theatre "${theatreForm.theatreName}".`);
+      }
+      setTheatreForm({ ...EMPTY_THEATRE, city: cities[0]?.name || "" });
+      loadAll();
+    } catch (err) {
+      notify(err.response?.data?.message || "Failed to save theatre.");
     }
-    setTheatreForm({ ...EMPTY_THEATRE, city: cities[0]?.name || "" });
-    loadAll();
   };
 
   const startEditTheatre = (t) => {
@@ -283,59 +323,95 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteCity = async (cityId) => {
-    await api.delete(`/manager/cities/${cityId}`);
-    notify("City removed.");
-    loadAll();
+    try {
+      await api.delete(`/manager/cities/${cityId}`);
+      notify("City removed.");
+      loadAll();
+    } catch (err) {
+      notify(err.response?.data?.message || "Failed to remove city.");
+    }
   };
 
   const handleAddShow = async (e) => {
     e.preventDefault();
-    await api.post("/shows", showForm);
-    notify("Showtime scheduled.");
-    loadAll();
+    if (!showForm.movie || !showForm.theatre) {
+      notify("Please add and select both a movie and a theatre first.");
+      return;
+    }
+    try {
+      await api.post("/shows", showForm);
+      notify("Showtime scheduled.");
+      loadAll();
+    } catch (err) {
+      notify(err.response?.data?.message || "Failed to schedule showtime.");
+    }
   };
 
   const handleApplyDelay = async (showId) => {
-    const entry = delayInputs[showId] || {};
-    const delayMinutes = Number(entry.minutes) || 15;
-    const reason = entry.reason || "Technical/cleaning delay";
-    const { data } = await api.post(`/shows/${showId}/delay`, { delayMinutes, reason });
-    notify(data.message);
-    sessionStorage.removeItem("imovies_shows_cache");
-    loadAll();
+    try {
+      const entry = delayInputs[showId] || {};
+      const delayMinutes = Number(entry.minutes) || 15;
+      const reason = entry.reason || "Technical/cleaning delay";
+      const { data } = await api.post(`/shows/${showId}/delay`, { delayMinutes, reason });
+      notify(data.message);
+      sessionStorage.removeItem("imovies_shows_cache");
+      loadAll();
+    } catch (err) {
+      notify(err.response?.data?.message || "Failed to apply show delay.");
+    }
   };
 
   const handleAddBanner = async (e) => {
     e.preventDefault();
-    await api.post("/banners", bannerForm);
-    notify("Hero banner published to Home slideshow.");
-    sessionStorage.removeItem("imovies_banners_cache");
-    setBannerForm({
-      title: "",
-      subtitle: "",
-      imageUrl: "",
-      movie: movies[0]?._id || "",
-      slideIntervalSec: 5,
-    });
-    loadAll();
+    try {
+      const payload = {
+        ...bannerForm,
+        movie: bannerForm.movie || undefined,
+      };
+      await api.post("/banners", payload);
+      notify("Hero banner published to Home slideshow.");
+      sessionStorage.removeItem("imovies_banners_cache");
+      setBannerForm({
+        title: "",
+        subtitle: "",
+        imageUrl: "",
+        movie: movies[0]?._id || "",
+        slideIntervalSec: 5,
+      });
+      loadAll();
+    } catch (err) {
+      notify(err.response?.data?.message || "Failed to publish banner.");
+    }
   };
 
   const handleApproveAdmin = async (id) => {
-    const { data } = await api.patch(`/manager/requests/${id}/approve`);
-    notify(data.message);
-    loadAll();
+    try {
+      const { data } = await api.patch(`/manager/requests/${id}/approve`);
+      notify(data.message);
+      loadAll();
+    } catch (err) {
+      notify(err.response?.data?.message || "Failed to approve request.");
+    }
   };
 
   const handleRejectAdmin = async (id) => {
-    const { data } = await api.patch(`/manager/requests/${id}/reject`);
-    notify(data.message);
-    loadAll();
+    try {
+      const { data } = await api.patch(`/manager/requests/${id}/reject`);
+      notify(data.message);
+      loadAll();
+    } catch (err) {
+      notify(err.response?.data?.message || "Failed to reject request.");
+    }
   };
 
   const handleChangeUserRole = async (id, newRole) => {
-    const { data } = await api.patch(`/manager/users/${id}/role`, { role: newRole });
-    notify(data.message);
-    loadAll();
+    try {
+      const { data } = await api.patch(`/manager/users/${id}/role`, { role: newRole });
+      notify(data.message);
+      loadAll();
+    } catch (err) {
+      notify(err.response?.data?.message || "Failed to update user role.");
+    }
   };
 
   const filteredBookings = useMemo(() => {
@@ -516,7 +592,6 @@ const AdminDashboard = () => {
         <>
           {tab === "approvals" && isManager && (
             <div className="space-y-8">
-              {/* Add Manager / Theatre Admin by Gmail + Staff Profile Card */}
               <div className="rounded-3xl border border-amber-500/30 bg-[#111827] p-6">
                 <h2 className="mb-1 flex items-center gap-2 text-base font-bold text-amber-300">
                   <MailPlus className="h-4 w-4 text-amber-400" />
@@ -570,7 +645,7 @@ const AdminDashboard = () => {
                     type="text"
                     value={staffGovtId}
                     onChange={(e) => setStaffGovtId(e.target.value)}
-                    placeholder="Govt ID Number (Aadhaar / PAN - optional)"
+                    placeholder="Govt ID Number (optional)"
                     className="rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2.5 text-xs text-white outline-none focus:border-amber-400"
                   />
 
@@ -603,9 +678,7 @@ const AdminDashboard = () => {
                 </form>
               </div>
 
-              {/* Active Head Managers & Approved Theatre Admins Lists */}
               <div className="grid gap-6 lg:grid-cols-2">
-                {/* Head Managers List */}
                 <div className="rounded-3xl border border-amber-500/30 bg-[#111827] p-6">
                   <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-amber-400">
                     <Crown className="h-4 w-4" /> Head Managers ({activeManagers.length})
@@ -639,7 +712,7 @@ const AdminDashboard = () => {
                             <p className="text-[11px] text-slate-400">{mgr.email}</p>
                             <p className="text-[11px] text-slate-300">
                               {mgr.phone ? `Mobile: ${mgr.phone}` : "No mobile"}
-                              {mgr.govtId ? ` • Govt ID: ${mgr.govtId}` : ""}
+                              {mgr.govtId ? ` • ID: ${mgr.govtId}` : ""}
                             </p>
                           </div>
                         </div>
@@ -657,7 +730,6 @@ const AdminDashboard = () => {
                   </div>
                 </div>
 
-                {/* Approved Theatre Admins List */}
                 <div className="rounded-3xl border border-slate-800 bg-[#111827] p-6">
                   <h3 className="mb-4 flex items-center gap-2 text-sm font-bold text-red-400">
                     <ShieldCheck className="h-4 w-4" /> Theatre Admins ({activeAdmins.length})
@@ -684,7 +756,7 @@ const AdminDashboard = () => {
                             <p className="text-[11px] text-slate-400">{adm.email}</p>
                             <p className="text-[11px] text-slate-300">
                               {adm.phone ? `Mobile: ${adm.phone}` : "No mobile"}
-                              {adm.govtId ? ` • Govt ID: ${adm.govtId}` : ""}
+                              {adm.govtId ? ` • ID: ${adm.govtId}` : ""}
                             </p>
                             <p className="text-[11px] text-amber-300">
                               Theatre: {adm.theatreName || "Assigned Cinema"}
@@ -954,8 +1026,13 @@ const AdminDashboard = () => {
                         </button>
                         <button
                           onClick={async () => {
-                            await api.delete(`/movies/${m._id}`);
-                            loadAll();
+                            try {
+                              await api.delete(`/movies/${m._id}`);
+                              notify("Movie deleted.");
+                              loadAll();
+                            } catch (err) {
+                              notify(err.response?.data?.message || "Failed to delete movie.");
+                            }
                           }}
                           className="flex items-center gap-1 rounded-lg border border-red-500/30 px-2.5 py-1 text-[11px] font-semibold text-red-400 hover:bg-red-500/10"
                         >
@@ -1101,8 +1178,13 @@ const AdminDashboard = () => {
                       </button>
                       <button
                         onClick={async () => {
-                          await api.delete(`/theatres/${t._id}`);
-                          loadAll();
+                          try {
+                            await api.delete(`/theatres/${t._id}`);
+                            notify("Theatre deleted.");
+                            loadAll();
+                          } catch (err) {
+                            notify(err.response?.data?.message || "Failed to delete theatre.");
+                          }
                         }}
                         className="flex items-center gap-1 rounded-lg border border-red-500/30 px-3 py-1.5 text-[11px] font-semibold text-red-400 hover:bg-red-500/10"
                       >
@@ -1123,10 +1205,16 @@ const AdminDashboard = () => {
               >
                 <h2 className="text-base font-bold text-white">Schedule Showtime</h2>
                 <select
+                  required
                   value={showForm.movie}
                   onChange={(e) => setShowForm({ ...showForm, movie: e.target.value })}
                   className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
                 >
+                  <option value="">
+                    {movies.length > 0
+                      ? "-- Select Movie --"
+                      : "No movies available — add one in Movies & Trailers"}
+                  </option>
                   {movies.map((m) => (
                     <option key={m._id} value={m._id}>
                       {m.movieName}
@@ -1134,10 +1222,16 @@ const AdminDashboard = () => {
                   ))}
                 </select>
                 <select
+                  required
                   value={showForm.theatre}
                   onChange={(e) => setShowForm({ ...showForm, theatre: e.target.value })}
                   className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
                 >
+                  <option value="">
+                    {theatres.length > 0
+                      ? "-- Select Theatre --"
+                      : "No theatres available — add one in Theatres"}
+                  </option>
                   {theatres.map((t) => (
                     <option key={t._id} value={t._id}>
                       {t.theatreName} ({t.city || t.location})
@@ -1145,6 +1239,7 @@ const AdminDashboard = () => {
                   ))}
                 </select>
                 <input
+                  required
                   value={showForm.screenName}
                   onChange={(e) => setShowForm({ ...showForm, screenName: e.target.value })}
                   placeholder="Screen Name"
@@ -1152,12 +1247,14 @@ const AdminDashboard = () => {
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <input
+                    required
                     type="date"
                     value={showForm.showdate}
                     onChange={(e) => setShowForm({ ...showForm, showdate: e.target.value })}
                     className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
                   />
                   <input
+                    required
                     type="time"
                     value={showForm.showtime}
                     onChange={(e) => setShowForm({ ...showForm, showtime: e.target.value })}
@@ -1191,8 +1288,13 @@ const AdminDashboard = () => {
                       </div>
                       <button
                         onClick={async () => {
-                          await api.delete(`/shows/${s._id}`);
-                          loadAll();
+                          try {
+                            await api.delete(`/shows/${s._id}`);
+                            notify("Showtime removed.");
+                            loadAll();
+                          } catch (err) {
+                            notify(err.response?.data?.message || "Failed to delete showtime.");
+                          }
                         }}
                         className="rounded-lg border border-red-500/30 px-3 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/10"
                       >
@@ -1273,11 +1375,15 @@ const AdminDashboard = () => {
                     Redirect Movie When Clicked
                   </label>
                   <select
-                    required
                     value={bannerForm.movie}
                     onChange={(e) => setBannerForm({ ...bannerForm, movie: e.target.value })}
                     className="w-full rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white"
                   >
+                    <option value="">
+                      {movies.length > 0
+                        ? "-- No Movie Redirect (Banner Only) --"
+                        : "No movies available — add one in Movies & Trailers"}
+                    </option>
                     {movies.map((m) => (
                       <option key={m._id} value={m._id}>
                         {m.movieName}
@@ -1318,13 +1424,18 @@ const AdminDashboard = () => {
                     <div className="p-4">
                       <h3 className="text-sm font-bold text-white">{b.title}</h3>
                       <p className="text-xs text-slate-400">
-                        Links to: {b.movie?.movieName || "Movie"} • Slide time: {b.slideIntervalSec}s
+                        Links to: {b.movie?.movieName || "None"} • Slide time: {b.slideIntervalSec}s
                       </p>
                       <button
                         onClick={async () => {
-                          await api.delete(`/banners/${b._id}`);
-                          sessionStorage.removeItem("imovies_banners_cache");
-                          loadAll();
+                          try {
+                            await api.delete(`/banners/${b._id}`);
+                            sessionStorage.removeItem("imovies_banners_cache");
+                            notify("Banner removed.");
+                            loadAll();
+                          } catch (err) {
+                            notify(err.response?.data?.message || "Failed to remove banner.");
+                          }
                         }}
                         className="mt-3 rounded-lg border border-red-500/30 px-3 py-1 text-xs font-semibold text-red-400 hover:bg-red-500/10"
                       >

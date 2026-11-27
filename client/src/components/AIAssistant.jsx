@@ -46,17 +46,7 @@ const AIAssistant = () => {
     recognition.start();
   };
 
-  if (!isOpen) {
-    return (
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2 rounded-full bg-gradient-to-r from-red-600 to-violet-600 px-5 py-3.5 text-sm font-bold text-white shadow-2xl shadow-violet-600/30 transition hover:scale-105"
-      >
-        <Sparkles className="h-5 w-5" />
-        <span>AI Concierge</span>
-      </button>
-    );
-  }
+  if (!isOpen) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex h-[520px] w-[360px] max-w-[92vw] flex-col overflow-hidden rounded-2xl border border-slate-700 bg-[#0f172a] shadow-2xl">
