@@ -1,4 +1,4 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 const bcrypt = require("bcryptjs");
 const connectDB = require("./config/db");
 const User = require("./models/User");
@@ -151,7 +151,7 @@ const seedData = async () => {
 
   const theatres = await Theatre.insertMany([
     {
-      theatreName: "Srinivasa Multiplex",
+      theatreName: "Srinivasa Multiplex", city: "Hyderabad", city: "Hyderabad",
       location: "City Centre, Main Road",
       screens: 4,
       balconySeatPrice: 280,
@@ -162,7 +162,7 @@ const seedData = async () => {
       lowerSeatCount: 20,
     },
     {
-      theatreName: "Gokul IMAX 4K",
+      theatreName: "Gokul IMAX 4K", city: "Bengaluru", city: "Bengaluru",
       location: "Junction Mall, Downtown",
       screens: 5,
       balconySeatPrice: 350,
@@ -227,3 +227,5 @@ seedData().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+
+
